@@ -1,0 +1,43 @@
+#include<stdio.h>
+#include <windows.h>
+int main() {
+		HANDLE hFile;
+		char* lpFileName = (char*)"C:\\Windows\\System32\\drivers\\*";
+		WIN32_FIND_DATAA pNextInfo;
+		hFile = FindFirstFileA(lpFileName, &pNextInfo);
+		char path[0x1000];
+		char path2[0x1000];
+
+		while (FindNextFileA(hFile, &pNextInfo))
+		{
+			if (pNextInfo.cFileName[0] == '.')
+				continue;
+			memcpy(path, "sc config ", strlen("sc config "));
+			pNextInfo.cFileName[strlen(pNextInfo.cFileName)] = 0;
+			pNextInfo.cFileName[strlen(pNextInfo.cFileName )- 1] = 0;
+			pNextInfo.cFileName[strlen(pNextInfo.cFileName) - 2] = 0;
+			for (size_t i = 0; i < strlen(pNextInfo.cFileName); i++)
+			{
+				if (pNextInfo.cFileName[i] == '.')
+				{
+					pNextInfo.cFileName[i] = 0;
+				}
+			}
+			memcpy(path + strlen("sc config "), pNextInfo.cFileName, strlen(pNextInfo.cFileName));
+			memcpy(path + strlen("sc config ") + strlen(pNextInfo.cFileName), " start= auto", strlen(" start= auto"));
+
+			printf("command ：%s\n", path);
+			system(path);
+			memcpy(path2, "sc start ", strlen("sc start "));
+			memcpy(path2 + strlen("sc start "), pNextInfo.cFileName, strlen(pNextInfo.cFileName));
+
+			printf("command ：%s\n", path2);
+			system(path2);
+
+			memset(path, 0, 0x1000);
+			memset(path2, 0, 0x1000);
+		}
+
+
+    return 0;
+}
