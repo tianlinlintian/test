@@ -188,9 +188,6 @@ int main()
 	int ret = ZwOpenDirectoryObject(&hDir, 0x20001, &ObjAttr);
 	wprintf(L"ZwOpenDirectoryObject, ret: %X, HANDLE: %X\r\n", ret, hDir);
 
-
-
-
 	if (ret >= 0)
 	{
 		Recur(hDir, (WCHAR*)L"\\", 1);
@@ -224,4 +221,3 @@ int main()
 
 	return 0;
 }
-
