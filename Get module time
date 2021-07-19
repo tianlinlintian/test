@@ -1,0 +1,65 @@
+//遍历目标进程的dll 并打印出最后的修改日期  这个看补丁有时不确定目标服务的漏洞文件时会用到
+#include <windows.h>
+#include <TlHelp32.h>
+#include <stdio.h>
+#include <locale.h>
+#include <atlstr.h>
+#pragma warning(disable:4996)
+
+int main()
+{
+
+    DWORD dwPId = 0;
+    HANDLE pFile;
+    DWORD fileSize;
+    char* buffer, * tmpBuf;
+    DWORD dwBytesRead, dwBytesToRead, tmpLen;
+
+    printf("请输入目标进程ID：");
+    scanf_s("%ud", &dwPId);
+
+    HANDLE        hModuleSnap = INVALID_HANDLE_VALUE;
+    MODULEENTRY32 me32 = { sizeof(MODULEENTRY32) };
+
+    hModuleSnap = CreateToolhelp32Snapshot(
+        TH32CS_SNAPMODULE,
+        dwPId);
+    if (hModuleSnap == INVALID_HANDLE_VALUE)
+        return false;
+
+    if (!Module32First(hModuleSnap, &me32)) {
+        CloseHandle(hModuleSnap);
+        return false;
+    }
+    WCHAR lpFileName[MAX_PATH];
+    wcscpy(lpFileName, (WCHAR*)L"C:\\Windows\\System32\\");
+    do {
+        wcscpy(lpFileName+wcslen(L"C:\\Windows\\System32\\"), me32.szModule);
+
+        pFile = CreateFileW(lpFileName, GENERIC_READ,
+            FILE_SHARE_READ,
+            NULL,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL);
+        if (pFile==(HANDLE)-1)
+        {
+            continue;
+        }
+
+        FILETIME fCreateTime, fAccessTime, fWriteTime, localTime;
+        GetFileTime(pFile, &fCreateTime, &fAccessTime, &fWriteTime);//获取文件时间
+
+        SYSTEMTIME sysTime;
+        FileTimeToLocalFileTime(&fWriteTime, &localTime);//将文件时间转换为本地文件时间
+        FileTimeToSystemTime(&localTime, &sysTime);//将本地文件时间转换为本地系统时间
+
+        CString strTime;
+
+        printf("%S   修改时间%4d年%2d月%2d日\n", lpFileName, sysTime.wYear, sysTime.wMonth, sysTime.wDay);
+    } while (Module32Next(hModuleSnap, &me32));
+
+    CloseHandle(hModuleSnap);
+
+    return 0;
+}
