@@ -48,11 +48,11 @@ int main()
         }
 
         FILETIME fCreateTime, fAccessTime, fWriteTime, localTime;
-        GetFileTime(pFile, &fCreateTime, &fAccessTime, &fWriteTime);//获取文件时间
+        GetFileTime(pFile, &fCreateTime, &fAccessTime, &fWriteTime);
 
         SYSTEMTIME sysTime;
-        FileTimeToLocalFileTime(&fWriteTime, &localTime);//将文件时间转换为本地文件时间
-        FileTimeToSystemTime(&localTime, &sysTime);//将本地文件时间转换为本地系统时间
+        FileTimeToLocalFileTime(&fWriteTime, &localTime);
+        FileTimeToSystemTime(&localTime, &sysTime);
 
         CString strTime;
 
