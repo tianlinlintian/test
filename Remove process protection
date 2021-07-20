@@ -1,0 +1,49 @@
+#include <ntddk.h>
+#define pid_offset  0x440
+#define list_offset  0x448
+#define name_offset  0x5A8
+#define Protection  0x87A    //20h2 x64 Protection偏移
+
+//win8以上微软在eprocess加入了Protection标志位用来保护系统进程，此驱动将会遍历进程抹去此标志位，主要是为了PRC VIEW能够访问到部分系统进程的模块
+
+VOID DriverUnload(PDRIVER_OBJECT  DriverObject)
+{
+    UNREFERENCED_PARAMETER(DriverObject);
+}
+
+
+NTSTATUS DriverEntry(PDRIVER_OBJECT  DriverObject, PUNICODE_STRING RegistryPath)
+{
+    UNREFERENCED_PARAMETER(RegistryPath);
+
+    UINT64 process_pid = 0;
+    PUCHAR process_name = NULL;
+    PLIST_ENTRY process_list = NULL;
+    PEPROCESS process_first = NULL;
+    PEPROCESS process_address = PsGetCurrentProcess();
+
+    process_list = (PLIST_ENTRY)((UINT64)process_address + list_offset);
+    process_first = (PEPROCESS)((UINT64)(process_list->Blink) - list_offset);
+    if (!process_address)
+    {
+        DbgPrint("[ERROR]: NOT ....\n");
+        return STATUS_SEVERITY_ERROR;
+    }
+
+    //遍历进程
+    while (process_address)
+    {
+        //  DbgPrint("%llx\n", (DWORD64)process_address + 0x87A);
+        *(CHAR*)((DWORD64)process_address + 0x87A) = 0;
+
+        process_list = process_list->Flink;
+        process_address = (PEPROCESS)((UINT64)(process_list)-list_offset);
+        if (process_first == process_address)
+        {
+            break;
+        }
+    }
+
+    DriverObject->DriverUnload = DriverUnload;
+    return STATUS_SUCCESS;
+}
