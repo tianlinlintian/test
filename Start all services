@@ -28,16 +28,16 @@ int main(int argc, char** argv)
 
     for (DWORD i = 0; i < dwServiceNum; i++)
     {
-       // cout << pcBuff[i].lpServiceName << endl << pcBuff[i].lpDisplayName << endl << pcBuff[i].ServiceStatusProcess.dwCurrentState << endl;
-
+        // cout << pcBuff[i].lpServiceName << endl << pcBuff[i].lpDisplayName << endl << pcBuff[i].ServiceStatusProcess.dwCurrentState << endl;
+        strcpy_s(path, "sc config ");
         memcpy(path + strlen("sc config "), pcBuff[i].lpServiceName, strlen(pcBuff[i].lpServiceName));
         memcpy(path + strlen("sc config ") + strlen(pcBuff[i].lpServiceName), " start= auto", strlen(" start= auto"));
 
-
+        printf("%s\n", path);
         system(path);
         memcpy(path2, "sc start ", strlen("sc start "));
         memcpy(path2 + strlen("sc start "), pcBuff[i].lpServiceName, strlen(pcBuff[i].lpServiceName));
-
+     
         system(path2);
 
         memset(path, 0, 0x1000);
@@ -49,5 +49,3 @@ int main(int argc, char** argv)
 
     CloseServiceHandle(hScm);
     return 0;
-    
-}
