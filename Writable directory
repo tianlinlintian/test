@@ -1,4 +1,4 @@
-下面这些目录对与普通用户来说有着写入权限也就是删除权限
+下面这些目录对与普通用户来说有写入权限
 C:\ProgramData
 C:\ProgramData\Application Data
 C:\ProgramData\Documents
