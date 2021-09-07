@@ -23,7 +23,6 @@ int main() {
    }
    while (fgets(str, 0x10000, fp))
    {
-       
        if ('Z' >= str[0] && str[0] >= 'A' || ('z' >= str[0] && str[0] >= 'a')|| (str[0]=='.'))
        {
            for (size_t i = 0; i < 0x10000; i++)
@@ -32,8 +31,6 @@ int main() {
                    (str[i] == 'N' && str[i + 1] == '/' && str[i + 2] == 'A'))
                {
                    str[i] ='\0';
-
-
                    strcpy(name, str);
                    for (size_t i = 0; i < strlen(name); i++)
                    {
@@ -75,7 +72,6 @@ int main() {
            strcpy(filename, &str[8]);
            filename[strlen(filename)-1] = '\0';
        }
-
    }
 
    getchar();
