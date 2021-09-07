@@ -66,7 +66,6 @@ int main() {
                    system(filename2);
                    memset(name, 0, MAX_PATH);
                    memset(filename2, 0, MAX_PATH);
-                   break;
                }
            }
        }
@@ -83,6 +82,3 @@ int main() {
 
    return 0;
 }
-
-
-
