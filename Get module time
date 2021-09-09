@@ -1,4 +1,4 @@
-//遍历目标进程的dll 并打印出最后的修改日期  这个看补丁有时不确定目标服务的漏洞文件时会用到
+
 #include <windows.h>
 #include <TlHelp32.h>
 #include <stdio.h>
