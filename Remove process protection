@@ -4,7 +4,6 @@
 #define name_offset  0x5A8
 #define Protection  0x87A    //20h2 x64 Protection偏移
 
-//win8以上微软在eprocess加入了Protection标志位用来保护系统进程，此驱动将会遍历进程抹去此标志位，主要是为了PRC VIEW能够访问到部分系统进程的模块
 
 VOID DriverUnload(PDRIVER_OBJECT  DriverObject)
 {
