@@ -266,11 +266,11 @@ void TraverseDirectory(wchar_t Dir[MAX_PATH])
 
 int main()
 {
-	//如果以普通权限运行 会将普通用户所有可以控制的目录设置为目录链接
+
 	TraverseDirectory2((WCHAR*)L"C:");
 
-	//如果以普通权限运行 会将普通用户所有可以控制的文件设置为符号链接
-  // TraverseDirectory((WCHAR*)L"C:");
+
+      // TraverseDirectory((WCHAR*)L"C:");
 
 	system("pause");
 	return 0;
