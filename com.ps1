@@ -20,7 +20,7 @@ $comsAsSystem  | Select-ComAccess -ProcessId (Get-Process -Name explorer).Id  | 
 #https://the-deniss.github.io/posts/2021/05/17/discovering-and-exploiting-mcafee-com-objects.html
 #https://vimeo.com/214856542
 
-#以20h2上low可以访问的medium接口为例，下面是clsid名
+#以20h2上low可以访问的medium接口为例，下面是clsid名  实际上medium可以访问的system接口几乎都可以通过OleViewDotNet.exe Registry->Local Services 查看
 #实际上不同操作系统之间差距挺大，特别是Windows Server和Windows 
 #Shared Reco Custom Marshaller COM
 #CDPComAccountProvider
