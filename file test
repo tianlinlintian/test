@@ -4,6 +4,9 @@
 #include "windows.h"
 #include <Strsafe.h>
 using namespace std;
+
+//一个函数是将所有当前进程权限可以访问的文件目录删除掉然后设置目录链接，一个函数将可以访问的文件是设置为符号链接，没啥用，练手的，切勿在真机运行
+
 #pragma warning(disable:4996)
 
 #pragma warning (disable: 4996)
