@@ -1,6 +1,8 @@
 #include "windows.h"
 #include "stdio.h"
-
+//跑个通信接口名字 就图个方便 要查看名字所在驱动可在DeviceIoControl调用之前设置了一个 __debugbreak()断点
+//另外还需要设置cpu为单核，命中 __debugbreak()断点后继续对bp nt!IofCallDriver下断点然后按g放行
+//nt!IofCallDriver断下后，一直按t单步跟，跟不了多久就会进入目标驱动的ioctl派遣函数（也就是nt!guard_dispatch_icall消失的时候）
 #pragma comment(lib,"ntdll.lib")
 
 #define STATUS_BUFFER_TOO_SMALL 0xC0000023
