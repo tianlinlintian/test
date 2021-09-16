@@ -22,7 +22,7 @@ $comsAsSystem  | Select-ComAccess -ProcessId (Get-Process -Name explorer).Id  | 
 
 #以20h2上low可以访问的medium接口为例，下面是clsid名  
 #而medium可以访问的system接口几乎都可以通过OleViewDotNet.exe Registry->Local Services 查看
-#ps :不同操作系统之间的结果差距挺大，特别是Windows Server和Windows 
+#ps :不同操作系统之间的结果会根据程序和组件的不同也不同 比如Windows Server和Windows 
 #Shared Reco Custom Marshaller COM
 #CDPComAccountProvider
 #Shield Provider User Session Agent
