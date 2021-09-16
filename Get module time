@@ -1,10 +1,11 @@
-
+//看服务类漏洞用的，有时候不确定目标服务补了哪个文件，所以索性查看修改日期
 #include <windows.h>
 #include <TlHelp32.h>
 #include <stdio.h>
 #include <locale.h>
 #include <atlstr.h>
 #pragma warning(disable:4996)
+
 
 int main()
 {
