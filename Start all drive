@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include <windows.h>
+//启动所有驱动 慎用，关机后会蓝屏
 int main() {
 		HANDLE hFile;
 		char* lpFileName = (char*)"C:\\Windows\\System32\\drivers\\*";
