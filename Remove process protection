@@ -1,3 +1,4 @@
+//移除有protection标志的进程，为了process explorer ，rpcview 等工具能查看所有进程信息
 #include <ntddk.h>
 #define pid_offset  0x440
 #define list_offset  0x448
