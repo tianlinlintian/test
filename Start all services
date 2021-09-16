@@ -1,7 +1,7 @@
 #include <iostream>
 #include <Windows.h>
 using namespace std;
-
+//启动所有服务
 
 int main(int argc, char** argv)
 {
