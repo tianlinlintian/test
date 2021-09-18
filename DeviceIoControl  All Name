@@ -1,10 +1,13 @@
-#include "windows.h"
-#include "stdio.h"
 //获得当前进程可以打开驱动设备通信接口名字 要查看名字所在驱动可在DeviceIoControl调用之前设置了一个 __debugbreak()断点
 //还需要设置cpu为单核，命中 __debugbreak()断点后继续对bp nt!IofCallDriver下断点然后按g放行
 //nt!IofCallDriver断下后，一直按t单步跟，跟不了多久就会进入目标驱动的ioctl派遣函数（也就是nt!guard_dispatch_icall消失的时候）
-//ps:结果不会包含所有，因为还有部分驱动在Createl派遣函数中也就是在打开设备时进行了了判断,
+//因为还有部分驱动在Createl派遣函数中也就是在打开设备时进行了了判断,
 //比如WS2IFSL，需要调用NtCreateFile设置扩展属性,参见https://github.com/bluefrostsecurity/CVE-2019-1215/blob/master/CVE-2019-1215-ws2ifsl/exploit.cpp
+//所以为了包含结果我将只要打开文件时只要不是拒绝访问或者没有设置IRP_MJ_CREATE,设备无效就打印错误值 以及设备名，这种情况需要自己去分析
+
+
+#include "windows.h"
+#include "stdio.h"
 
 #pragma comment(lib,"ntdll.lib")
 
@@ -122,10 +125,10 @@ int Recur(HANDLE hDirectory, wchar_t* DirName, int LevelX)
 				pUni++;
 				if (pUni->Length != 0 && pUni->MaxLength != 0 && pUni->Buffer != 0) Type = pUni->Buffer;
 				wchar_t FullObjName[MAX_PATH + 1] = { 0 };
-				if (Name && Type&& !_wcsicmp(Type, L"Device"))
+				if (Name && Type && !_wcsicmp(Type, L"Device"))
 				{
-					
-				//	wprintf(L"%s Name: %s, Type: %s\r\n", Print_Level(LevelX), Name, Type);
+
+					//	wprintf(L"%s Name: %s, Type: %s\r\n", Print_Level(LevelX), Name, Type);
 
 					wcscpy_s(FullObjName, DirName);
 					wcscat_s(FullObjName, Name);
@@ -133,8 +136,13 @@ int Recur(HANDLE hDirectory, wchar_t* DirName, int LevelX)
 					wcscat_s(path, FullObjName);
 					HANDLE hDriver = CreateFileW(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
 
+					
 					if (hDriver != INVALID_HANDLE_VALUE) {
 						printf("%S\n", path);
+					}
+					else if (GetLastError() > 5 && GetLastError() != 31)
+					{
+						printf("%S   需要进一步分析，错误值%d\n", path, GetLastError());
 					}
 					memset(path, 0, MAX_PATH);
 					//wprintf(L"%s\n", FullObjName);
@@ -157,7 +165,7 @@ int Recur(HANDLE hDirectory, wchar_t* DirName, int LevelX)
 
 					HANDLE hDir_S = 0;
 					int ret_S = ZwOpenDirectoryObject(&hDir_S, 0x20001, &ObjAttr_S);
-					
+
 					if (ret_S < 0)
 					{
 					}
@@ -218,6 +226,10 @@ int main()
 			
 			if (hDriver != INVALID_HANDLE_VALUE) {
 				printf("%s\n", path);
+			}
+			else if (GetLastError() > 5&& GetLastError()!=31)
+			{
+				printf("%s   需要进一步分析，错误值%d\n", path, GetLastError());
 			}
 			memset(path, 0, MAX_PATH);
 
