@@ -1,4 +1,4 @@
-//安装并启动所有的驱动 
+//启动所有的驱动 
 //请在虚拟机下运行 否则电脑无法开机
 #include<stdio.h>
 #include <windows.h>
@@ -27,7 +27,7 @@ int main() {
 				pNextInfo.cFileName[i] = 0;
 			}
 		}
-		memcpy(path3, "sc create ", strlen("sc create "));
+		/*memcpy(path3, "sc create ", strlen("sc create "));
 		memcpy(path3 + strlen("sc create "), pNextInfo.cFileName, strlen(pNextInfo.cFileName));
 		strcat(path3, " binPath=C:\\Windows\\System32\\drivers\\");
 		strcat(path3, pNextInfo.cFileName);
@@ -35,7 +35,7 @@ int main() {
 		strcat(path3, " type=kernel start=auto");
 
 		printf("command ：%s\n", path3);
-		system(path3);
+		system(path3);*/
 
 		memcpy(path + strlen("sc config "), pNextInfo.cFileName, strlen(pNextInfo.cFileName));
 		memcpy(path + strlen("sc config ") + strlen(pNextInfo.cFileName), " start= auto", strlen(" start= auto"));
@@ -49,7 +49,7 @@ int main() {
 
 		system(path2);
 
-		memset(path3, 0, 0x1000);
+	//	memset(path3, 0, 0x1000);
 		memset(path, 0, 0x1000);
 		memset(path2, 0, 0x1000);
 	}
