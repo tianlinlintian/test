@@ -140,20 +140,21 @@ int main() {
 
 	DeviceIoControl(h, FSCTL_SET_REPARSE_POINT, buffer, 0x2c, 0, 0, &dw, 0);
 	CloseHandle(h);
+	
+  	 //取消挂载点
+	//h = CreateFileA("C:\\Users\\Public\\123",
+	//	GENERIC_READ | (1 ? GENERIC_WRITE : 0),
+	//	FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+	//	0,
+	//	OPEN_EXISTING,
+	//	FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+	//	0);
 
-	h = CreateFileA("C:\\Users\\Public\\123",
-		GENERIC_READ | (1 ? GENERIC_WRITE : 0),
-		FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-		0,
-		OPEN_EXISTING,
-		FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
-		0);
-
-    //取消挂载点
-    //REPARSE_GUID_DATA_BUFFER reparse_buffer = { 0 };
-    //reparse_buffer.ReparseTag = IO_REPARSE_TAG_MOUNT_POINT;
-    //DeviceIoControl(h, FSCTL_DELETE_REPARSE_POINT, &reparse_buffer, REPARSE_GUID_DATA_BUFFER_HEADER_SIZE,0, 0, &dw, 0);
-    //CloseHandle(h);
+ 
+    	//REPARSE_GUID_DATA_BUFFER reparse_buffer = { 0 };
+    	//reparse_buffer.ReparseTag = IO_REPARSE_TAG_MOUNT_POINT;
+    	//DeviceIoControl(h, FSCTL_DELETE_REPARSE_POINT, &reparse_buffer, REPARSE_GUID_DATA_BUFFER_HEADER_SIZE,0, 0, &dw, 0);
+    	//CloseHandle(h);
 
 	return 0;
 }
