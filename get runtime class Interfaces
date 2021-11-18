@@ -8,8 +8,7 @@
 #pragma comment (lib,"Windowsapp.lib")
 
 
-
-class __declspec(uuid("5474a982-e485-45bd-bb9c-d8fcce05ba7e")) WindowsUpdateInstallControl : public IUnknown {
+class __declspec(uuid("5474a982-e485-45bd-bb9c-d8fcce05ba7e")) WindowsUpdateInstallControl : public IInspectable {
 public:
     virtual HRESULT __stdcall Proc6(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */ HSTRING p1);
     virtual HRESULT __stdcall Proc7(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */ HSTRING p1, /* Stack Offset: 24 */ HSTRING p2);
