@@ -1,0 +1,95 @@
+#include<stdio.h>
+#include<windows.h>
+#include<comdef.h>
+#include<string>
+#include<roapi.h>
+#include<winstring.h>
+#include<inspectable.h>
+#pragma comment (lib,"Windowsapp.lib")
+
+
+
+class __declspec(uuid("5474a982-e485-45bd-bb9c-d8fcce05ba7e")) WindowsUpdateInstallControl : public IUnknown {
+public:
+    virtual HRESULT __stdcall Proc6(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */ HSTRING p1);
+    virtual HRESULT __stdcall Proc7(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */ HSTRING p1, /* Stack Offset: 24 */ HSTRING p2);
+    virtual HRESULT __stdcall Proc8(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */ HSTRING p1);
+    virtual HRESULT __stdcall Proc9(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */ HSTRING p1);
+    virtual HRESULT __stdcall Proc10(/* Stack Offset: 8 */ void** p0);
+    virtual HRESULT __stdcall Proc11(/* Stack Offset: 8 */ /* ENUM32 */ uint32_t* p0);
+    virtual HRESULT __stdcall Proc12(/* Stack Offset: 8 */ /* ENUM32 */ uint32_t p0);
+    virtual HRESULT __stdcall Proc13(/* Stack Offset: 8 */ void* p0, /* Stack Offset: 16 */ struct Struct_1036* p1);
+    virtual HRESULT __stdcall Proc14(/* Stack Offset: 8 */ struct Struct_1036 p0);
+    virtual HRESULT __stdcall Proc15(/* Stack Offset: 8 */ void* p0, /* Stack Offset: 16 */ struct Struct_1036* p1);
+    virtual HRESULT __stdcall Proc16(/* Stack Offset: 8 */ struct Struct_1036 p0);
+    virtual HRESULT __stdcall Proc17(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */ int64_t p1, /* Stack Offset: 24 */ int64_t p2, /* Stack Offset: 32 */ HSTRING p3, /* Stack Offset: 40 */ HSTRING p4);
+    virtual HRESULT __stdcall Proc18(/* Stack Offset: 8 */ HSTRING p0);
+    virtual HRESULT __stdcall Proc19(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */ IInspectable** p1);
+    virtual HRESULT __stdcall Proc20(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */void** p1);
+    virtual HRESULT __stdcall Proc21(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */void* p1, /* Stack Offset: 24 */ /* ENUM32 */ uint32_t p2, /* Stack Offset: 32 */ int64_t p3, /* Stack Offset: 40 */ HSTRING p4, /* Stack Offset: 48 */ HSTRING p5, /* Stack Offset: 56 */ HSTRING p6, /* Stack Offset: 64 */ HSTRING p7, /* Stack Offset: 72 */ void** p8);
+    virtual HRESULT __stdcall Proc22(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */ void* p1, /* Stack Offset: 24 */ /* ENUM32 */ uint32_t p2, /* Stack Offset: 32 */ int64_t p3, /* Stack Offset: 40 */ HSTRING p4, /* Stack Offset: 48 */ HSTRING p5, /* Stack Offset: 56 */ HSTRING p6, /* Stack Offset: 64 */ HSTRING p7, /* Stack Offset: 72 */ void** p8);
+    virtual HRESULT __stdcall Proc23(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */void* p1, /* Stack Offset: 24 */ /* ENUM32 */ uint32_t p2, /* Stack Offset: 32 */ int64_t p3, /* Stack Offset: 40 */ HSTRING p4, /* Stack Offset: 48 */ HSTRING p5, /* Stack Offset: 56 */ HSTRING p6, /* Stack Offset: 64 */ HSTRING p7, /* Stack Offset: 72 */ void** p8);
+    virtual HRESULT __stdcall Proc24(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */ void* p1, /* Stack Offset: 24 */ int64_t p2, /* Stack Offset: 32 */ int8_t p3, /* Stack Offset: 40 */ HSTRING p4, /* Stack Offset: 48 */ HSTRING p5, /* Stack Offset: 56 */ void** p6);
+    virtual HRESULT __stdcall Proc25(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */void* p1, /* Stack Offset: 24 */ int8_t p2, /* Stack Offset: 32 */ int8_t p3, /* Stack Offset: 40 */ int8_t p4, /* Stack Offset: 48 */ HSTRING p5, /* Stack Offset: 56 */ HSTRING p6, /* Stack Offset: 64 */ void** p7);
+    virtual HRESULT __stdcall Proc26(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */ HSTRING p1, /* Stack Offset: 24 */ HSTRING p2, /* Stack Offset: 32 */ HSTRING p3, /* Stack Offset: 40 */ int8_t p4, /* Stack Offset: 48 */ HSTRING p5, /* Stack Offset: 56 */ HSTRING p6, /* Stack Offset: 64 */ HSTRING p7, /* Stack Offset: 72 */ HSTRING p8);
+    virtual HRESULT __stdcall Proc27(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */ HSTRING p1, /* Stack Offset: 24 */ HSTRING p2, /* Stack Offset: 32 */ HSTRING p3, /* Stack Offset: 40 */ HSTRING p4, /* Stack Offset: 48 */ int8_t p5, /* Stack Offset: 56 */ HSTRING* p6);
+    virtual HRESULT __stdcall Proc28(/* Stack Offset: 8 */ int8_t p0, /* Stack Offset: 16 */ int8_t p1, /* Stack Offset: 24 */ int8_t p2);
+    virtual HRESULT __stdcall Proc29(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */void* p1);
+    virtual HRESULT __stdcall Proc30(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */ HSTRING p1, /* Stack Offset: 24 */ HSTRING p2, /* Stack Offset: 32 */ HSTRING p3, /* Stack Offset: 40 */ HSTRING p4, /* Stack Offset: 48 */ HSTRING p5, /* Stack Offset: 56 */ HSTRING p6);
+    virtual HRESULT __stdcall Proc31(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */ HSTRING p1);
+    virtual HRESULT __stdcall Proc32(/* Stack Offset: 8 */ HSTRING p0, /* Stack Offset: 16 */ HSTRING p1);
+};
+
+
+
+WindowsUpdateInstallControl *test;
+
+
+template <typename ...TInterfaces> class RuntimeClass;
+
+int main() {
+
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+
+    static const WCHAR* className = L"WindowsUpdate.Internal.InstallControl";  //runtime class name
+    const UINT32 clen = wcslen(className);
+
+
+    HSTRING hClassName = NULL;
+    HSTRING_HEADER header;
+    HRESULT hr = WindowsCreateStringReference(className, clen, &header, &hClassName);
+
+    if (hr != S_OK)
+    {
+        printf("WindowsCreateStringReference ERROR %x\n", hr);
+        getchar();
+        return 0;
+    }
+
+    IInspectable* inspectable;
+    hr = RoActivateInstance(hClassName, &inspectable);
+
+    if (hr != S_OK)
+    {
+        printf("RoActivateInstance ERROR %x\n", hr);
+        getchar();
+        return 0;
+    }
+
+    ULONG iidCount;
+   // inspectable->GetIids(&iidCount, (IID **)&iid);
+   // printf("Iids: %d\r\n", iidCount);
+
+    hr = inspectable->QueryInterface(__uuidof(test), (void**)&test);
+    if (hr != S_OK)
+    {
+        printf("QueryInterface ERROR %x\n", hr);
+        getchar();
+        return 0;
+    }
+
+    printf("%x", test);
+
+
+    return 0;
+}
