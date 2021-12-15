@@ -1,5 +1,5 @@
 //微软发布的补丁大多数标题名和漏洞文件的文件说明相关 此程序则是遍历文件说明，如果匹配则打印文件名以及修改时间
-
+//一个好的使用方式是 cmd 这个exe名 >>1.TXT 安装补丁后 这个exe名 >>2.TXT  之后再对比1.txt和2.txt文件内容
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
