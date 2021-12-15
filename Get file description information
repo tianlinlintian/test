@@ -1,5 +1,5 @@
-//微软发布的补丁大多数标题名和漏洞文件的文件说明相关 此程序则是遍历文件说明，如果匹配则打印文件名以及修改时间
-//一个好的使用方式是 cmd 这个exe名 >>1.TXT 安装补丁后 这个exe名 >>2.TXT  之后再对比1.txt和2.txt文件内容
+//微软发布的补丁大多数标题名和漏洞文件的说明名相关 此程序则是遍历文件说明，如果匹配则打印文件名以及修改时间
+//如果结果特别多那么一个好的处理方式是 cmd 这个exe名 >>1.TXT 安装补丁后 这个exe名 >>2.TXT  之后再对比1.txt和2.txt文件内容
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
@@ -156,7 +156,7 @@ void TraverseDirectory(CHAR Dir[MAX_PATH], CHAR* info)
 int main() {
 
 	//传入一个文件路径名，一个文件信息名，如果遍历的文件中文件说明有匹配的则打印
-	TraverseDirectory((char*)"C:\\Windows",(char*)"Windows Media Center");
+	TraverseDirectory((char*)"C:\\Windows",(char*)"Digital Media");
 
 	return 0;
 }
