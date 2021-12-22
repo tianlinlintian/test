@@ -1,5 +1,6 @@
-#include<stdio.h>
+#include <stdio.h>
 #include <windows.h>
+
 typedef struct _IO_STATUS_BLOCK {
     union {
         NTSTATUS Status;
@@ -24,14 +25,19 @@ int main() {
 
     HANDLE hDriver = CreateFileA("\\\\.\\GLOBALROOT\\Device\\?", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
     ULONG dw;
+
     if (hDriver == INVALID_HANDLE_VALUE) {
-        system("pause");
+        printf("[-] CreateFile (0x%X)\n", GetLastError());
         return(-1);
     }
+
     LPCWSTR nt = L"ntdll";
     HMODULE hntdll = GetModuleHandle(nt);
+
     IO_STATUS_BLOCK p = {};
+
     NtDeviceIoControlFile tDeviceIoControl = (NtDeviceIoControlFile)GetProcAddress((HMODULE)hntdll, "NtDeviceIoControlFile");
+
     if (!tDeviceIoControl) {
         printf("[-] Fail to resolve ZwDeviceIoControlFile(0x%X)\n", GetLastError());
         system("pause");
