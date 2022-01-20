@@ -1,0 +1,329 @@
+//此代码缺陷在于无法设置sddl权限作用域 
+
+//比如
+//仅此文件夹
+//此文件夹、子文件夹和文件
+//此文件夹和子文件夹
+//此文件夹和文件
+//仅限子文件夹和文件
+//仅子文件夹
+//仅文件
+
+
+#include <windows.h>
+#include <stdio.h>	
+#include <tchar.h>
+#include <winternl.h>
+#pragma comment(lib, "ntdll.lib")
+
+#pragma warning(disable:4996)
+
+
+//使用Windows的HeapAlloc函数进行动态内存分配
+#define myheapalloc(x) (HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, x))
+#define myheapfree(x) (HeapFree(GetProcessHeap(), 0, x))
+typedef BOOL(WINAPI* SetSecurityDescriptorControlFnPtr)(
+	IN 						PSECURITY_DESCRIPTOR pSecurityDescriptor,
+	IN 						SECURITY_DESCRIPTOR_CONTROL ControlBitsOfInterest,
+	IN 						SECURITY_DESCRIPTOR_CONTROL ControlBitsToSet);
+
+typedef BOOL(WINAPI* AddAccessAllowedAceExFnPtr)(PACL pAcl,
+	DWORD dwAceRevision, DWORD AceFlags, DWORD AccessMask, PSID pSid);
+
+
+
+typedef BOOL(WINAPI* AddAccessDeniedAceExFnPtr)(PACL pAcl,
+	DWORD dwAceRevision, DWORD AceFlags, DWORD AccessMask, PSID pSid);
+
+// argv[1] – 文件（目录）名
+// argv[2] – 用户（组）名
+// argv[3] GENERIC_ALL表示所有的权限，其是一系列的NTFS权限
+// argv[4]  是否继承原来的父目录安全属性
+// argv[5] 添加允许访问还是拒绝访问
+BOOL AddAccessRights(TCHAR* lpszFileName, TCHAR* lpszAccountName, DWORD dwAccessMask, BOOL OF,BOOL OF2) {
+	// 声明SID变量
+	SID_NAME_USE snuType;
+	// 声明和LookupAccountName相关的变量（注意，全为0，要在程序中动态分配）
+	TCHAR* szDomain = NULL;
+	DWORD cbDomain = 0;
+	LPVOID pUserSID = NULL;
+	DWORD cbUserSID = 0;
+	// 和文件相关的安全描述符 SD 的变量
+	PSECURITY_DESCRIPTOR pFileSD = NULL; // 结构变量
+	DWORD cbFileSD = 0; // SD的size
+	// 一个新的SD的变量，用于构造新的ACL（把已有的ACL和需要新加的ACL整合起来）
+	SECURITY_DESCRIPTOR newSD;
+	// 和ACL 相关的变量
+	PACL pACL = NULL;
+	BOOL fDaclPresent;
+	BOOL fDaclDefaulted;
+	ACL_SIZE_INFORMATION AclInfo;
+	// 一个新的 ACL 变量
+	PACL pNewACL = NULL; //结构指针变量
+	DWORD cbNewACL = 0; //ACL的size
+	// 一个临时使用的 ACE 变量
+	LPVOID pTempAce = NULL;
+	UINT CurrentAceIndex = 0; //ACE在ACL中的位置
+	UINT newAceIndex = 0; //新添的ACE在ACL中的位置
+	//API函数的返回值，假设所有的函数都返回失败。
+	BOOL fResult;
+	BOOL fAPISuccess;
+	SECURITY_INFORMATION secInfo = DACL_SECURITY_INFORMATION;
+
+	SetSecurityDescriptorControlFnPtr _SetSecurityDescriptorControl = NULL;
+	AddAccessAllowedAceExFnPtr _AddAccessAllowedAceEx = NULL;
+
+	
+
+	fAPISuccess = LookupAccountName(NULL, lpszAccountName,
+		pUserSID, &cbUserSID, szDomain, &cbDomain, &snuType);
+
+	if (fAPISuccess)
+		return FALSE;
+	else if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+		_tprintf(TEXT("LookupAccountName() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+	pUserSID = myheapalloc(cbUserSID);
+	if (!pUserSID) {
+		_tprintf(TEXT("HeapAlloc() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+	szDomain = (TCHAR*)myheapalloc(cbDomain * sizeof(TCHAR));
+	if (!szDomain) {
+		_tprintf(TEXT("HeapAlloc() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+	fAPISuccess = LookupAccountName(NULL, lpszAccountName,
+		pUserSID, &cbUserSID, szDomain, &cbDomain, &snuType);
+	if (!fAPISuccess) {
+		_tprintf(TEXT("LookupAccountName() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+
+
+	fAPISuccess = GetFileSecurity(lpszFileName, secInfo, pFileSD, 0, &cbFileSD);
+	
+	if (fAPISuccess)
+		return FALSE;
+	else if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+		_tprintf(TEXT("GetFileSecurity() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+	pFileSD = myheapalloc(cbFileSD);
+	if (!pFileSD) {
+		_tprintf(TEXT("HeapAlloc() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+	fAPISuccess = GetFileSecurity(lpszFileName, secInfo, pFileSD, cbFileSD, &cbFileSD);
+	if (!fAPISuccess) {
+		_tprintf(TEXT("GetFileSecurity() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+	puts("STEP 2");
+
+	// ##########################################################
+	// STEP 3: 初始化一个新的SD
+	// ##########################################################
+	if (!InitializeSecurityDescriptor(&newSD, SECURITY_DESCRIPTOR_REVISION)) {
+		_tprintf(TEXT("InitializeSecurityDescriptor() failed.")
+			TEXT("Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+	puts("STEP 3");
+
+
+	if (!GetSecurityDescriptorDacl(pFileSD, &fDaclPresent, &pACL, &fDaclDefaulted)) {
+		_tprintf(TEXT("GetSecurityDescriptorDacl() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+	puts("STEP 4");
+
+	AclInfo.AceCount = 0; // Assume NULL DACL.
+	AclInfo.AclBytesFree = 0;
+	AclInfo.AclBytesInUse = sizeof(ACL);
+	if (pACL == NULL)
+		fDaclPresent = FALSE;
+
+	if (fDaclPresent) {
+		if (!GetAclInformation(pACL, &AclInfo, sizeof(ACL_SIZE_INFORMATION), AclSizeInformation)) {
+			_tprintf(TEXT("GetAclInformation() failed. Error %ld/n"), GetLastError());
+			return FALSE;
+		}
+	}
+	puts("STEP 5");
+
+	
+	cbNewACL = AclInfo.AclBytesInUse + sizeof(ACCESS_ALLOWED_ACE) + GetLengthSid(pUserSID) - sizeof(DWORD);
+	puts("STEP 6");
+
+
+	pNewACL = (PACL)myheapalloc(cbNewACL);
+	if (!pNewACL) {
+		_tprintf(TEXT("HeapAlloc() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+	puts("STEP 7");
+
+	
+	if (!InitializeAcl(pNewACL, cbNewACL, ACL_REVISION2)) {
+		_tprintf(TEXT("InitializeAcl() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+	puts("STEP 8");
+
+
+	newAceIndex = 0;
+	if (fDaclPresent && AclInfo.AceCount) {
+		for (CurrentAceIndex = 0; CurrentAceIndex < AclInfo.AceCount; CurrentAceIndex++) {
+		
+			if (!GetAce(pACL, CurrentAceIndex, &pTempAce)) {
+				_tprintf(TEXT("GetAce() failed. Error %ld/n"), GetLastError());
+				return FALSE;
+			}
+			puts("STEP 10");
+			if (((ACCESS_ALLOWED_ACE*)pTempAce)->Header.AceFlags & INHERITED_ACE)
+				break;
+	
+			if (!AddAce(pNewACL, ACL_REVISION, MAXDWORD, pTempAce, ((PACE_HEADER)pTempAce)->AceSize)) {
+				_tprintf(TEXT("AddAce() failed. Error %ld/n"), GetLastError());
+				return FALSE;
+			}
+			newAceIndex++;
+		}
+	}
+	
+	AddAccessDeniedAceExFnPtr _AddAccessDeniedAceEx = NULL;
+
+	_AddAccessDeniedAceEx = (AddAccessDeniedAceExFnPtr)GetProcAddress(GetModuleHandle(TEXT("advapi32.dll")),
+		"AddAccessDeniedAceEx");
+
+	_AddAccessAllowedAceEx = (AddAccessAllowedAceExFnPtr)GetProcAddress(GetModuleHandle(TEXT("advapi32.dll")),
+		"AddAccessAllowedAceEx");
+
+	if (OF2)
+	{
+		if (_AddAccessAllowedAceEx) {
+			if (!_AddAccessAllowedAceEx(pNewACL, ACL_REVISION2,
+				CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE, dwAccessMask, pUserSID)) {
+				_tprintf(TEXT("AddAccessAllowedAceEx() failed. Error %ld/n"), GetLastError());
+				return FALSE;
+			}
+		}
+		else {
+			if (!AddAccessAllowedAce(pNewACL, ACL_REVISION2, dwAccessMask, pUserSID)) {
+				_tprintf(TEXT("AddAccessAllowedAce() failed. Error %ld/n"), GetLastError());
+				return FALSE;
+			}
+		}
+	}
+	else
+	{
+		if (_AddAccessDeniedAceEx) {
+			if (!_AddAccessDeniedAceEx(pNewACL, ACL_REVISION2,
+				CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE, dwAccessMask, pUserSID)) {
+				_tprintf(TEXT("AddAccessAllowedAceEx() failed. Error %ld/n"), GetLastError());
+				return FALSE;
+			}
+		}
+		else {
+			if (!AddAccessDeniedAce(pNewACL, ACL_REVISION2, dwAccessMask, pUserSID)) {
+				_tprintf(TEXT("AddAccessAllowedAce() failed. Error %ld/n"), GetLastError());
+				return FALSE;
+			}
+		}
+	}
+	
+
+	if (OF)
+	{
+		
+		if (fDaclPresent && AclInfo.AceCount) {
+			for (; CurrentAceIndex < AclInfo.AceCount; CurrentAceIndex++) {
+				
+				if (!GetAce(pACL, CurrentAceIndex, &pTempAce)) {
+					_tprintf(TEXT("GetAce() failed. Error %ld/n"), GetLastError());
+					return FALSE;
+				}
+				
+				if (!AddAce(pNewACL, ACL_REVISION, MAXDWORD, pTempAce, ((PACE_HEADER)pTempAce)->AceSize)) {
+					_tprintf(TEXT("AddAce() failed. Error %ld/n"), GetLastError());
+					return FALSE;
+				}
+			}
+		}
+	}
+
+	
+	if (!SetSecurityDescriptorDacl(&newSD, TRUE, pNewACL, FALSE)) {
+		_tprintf(TEXT("SetSecurityDescriptorDacl() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+
+	
+	if (OF)
+	{
+		_SetSecurityDescriptorControl = (SetSecurityDescriptorControlFnPtr)GetProcAddress(GetModuleHandle(TEXT("advapi32.dll")),
+			"SetSecurityDescriptorControl");
+		if (_SetSecurityDescriptorControl) {
+			SECURITY_DESCRIPTOR_CONTROL controlBitsOfInterest = 0;
+			SECURITY_DESCRIPTOR_CONTROL controlBitsToSet = 0;
+			SECURITY_DESCRIPTOR_CONTROL oldControlBits = 0;
+			DWORD dwRevision = 0;
+			if (!GetSecurityDescriptorControl(pFileSD, &oldControlBits, &dwRevision)) {
+				_tprintf(TEXT("GetSecurityDescriptorControl() failed.")
+					TEXT("Error %ld/n"), GetLastError());
+				return FALSE;
+			}
+			if (oldControlBits & SE_DACL_AUTO_INHERITED) {
+				controlBitsOfInterest = SE_DACL_AUTO_INHERIT_REQ |
+					SE_DACL_AUTO_INHERITED;
+				controlBitsToSet = controlBitsOfInterest;
+			}
+			else if (oldControlBits & SE_DACL_PROTECTED) {
+				controlBitsOfInterest = SE_DACL_PROTECTED;
+				controlBitsToSet = controlBitsOfInterest;
+			}
+			if (controlBitsOfInterest) {
+				if (!_SetSecurityDescriptorControl(&newSD, controlBitsOfInterest, controlBitsToSet)) {
+					_tprintf(TEXT("SetSecurityDescriptorControl() failed.")
+						TEXT("Error %ld/n"), GetLastError());
+					return FALSE;
+				}
+			}
+		}
+	}
+
+	if (!SetFileSecurity(lpszFileName, secInfo, &newSD)) {
+		_tprintf(TEXT("SetFileSecurity() failed. Error %ld/n"), GetLastError());
+		return FALSE;
+	}
+	fResult = TRUE;
+
+	if (pUserSID)
+		myheapfree(pUserSID);
+	if (szDomain)
+		myheapfree(szDomain);
+	if (pFileSD)
+		myheapfree(pFileSD);
+	if (pNewACL)
+		myheapfree(pNewACL);
+	return fResult;
+}
+
+
+int main(int argc, char* argv[]) {
+
+	CreateDirectoryA("C:\\ProgramData\\test", 0);
+
+	//对test文件夹添加一个 拒绝所有人读取的访问权限
+	AddAccessRights((TCHAR*)L"C:\\ProgramData\\test", (TCHAR*)L"Everyone", GENERIC_READ, 0, 0);
+
+	//对test文件夹添加一个 允许所有人完全控制的访问权限
+	AddAccessRights((TCHAR*)L"C:\\ProgramData\\test", (TCHAR*)L"Everyone", GENERIC_ALL, 0, 1);
+
+
+	getchar();
+
+	return 0;
+}
