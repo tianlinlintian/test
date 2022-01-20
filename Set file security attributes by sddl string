@@ -1,3 +1,8 @@
+//查看文件dacl可以在powershlel
+
+//$acl = Get-Acl 文件名
+//$acl.Sddl
+
 #include <windows.h>
 #include <sddl.h>
 #include <stdio.h>
@@ -22,19 +27,10 @@ BOOL CreateMyDACL(SECURITY_ATTRIBUTES* pSA,CHAR* szSD)
 void main()
 {
     SECURITY_ATTRIBUTES  sa;
-    SECURITY_ATTRIBUTES  sa2;
-
     
     sa.nLength = sizeof(SECURITY_ATTRIBUTES);
     sa.bInheritHandle = FALSE;
 
-    sa2.nLength = sizeof(SECURITY_ATTRIBUTES);
-    sa2.bInheritHandle = FALSE;
-
-    OBJECT_ATTRIBUTES	oa = { 0 };
-    IO_STATUS_BLOCK		IoStatus = { 0 };
-    UNICODE_STRING		us;
-    HANDLE HD;
 
     if (!CreateMyDACL(&sa, (CHAR*)"D:(D;;DT;;;WD)(A;;GA;;;WD)"))
     {
@@ -46,22 +42,15 @@ void main()
     CreateDirectoryA("C:\\ProgramData\\test0", &sa);
 
 
-    if (!CreateMyDACL(&sa2, (CHAR*)"D:(A;;GR;;;WD)(A;;GA;;;BA)(A;;0;;;OW)"))
+    if (!CreateMyDACL(&sa, (CHAR*)"D:(A;;GR;;;WD)(A;;GA;;;BA)(A;;0;;;OW)"))
     {
         printf("Failed CreateMyDACL\n");
         getchar();
         exit(1);
     }
 
-    RtlInitUnicodeString(&us, L"\\??\\C:\\ProgramData\\test0\\eses23.txt");
-
-    oa.ObjectName = &us;
-    oa.SecurityDescriptor = &sa2;
-    oa.Attributes = OBJ_CASE_INSENSITIVE;
-    oa.Length = sizeof(OBJECT_ATTRIBUTES);
-
  
-    HANDLE hFILE = CreateFileA("C:\\ProgramData\\test0\\eses23.txt", GENERIC_WRITE, 0, &sa2, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE hFILE = CreateFileA("C:\\ProgramData\\test0\\eses23.txt", GENERIC_WRITE, 0, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
     getchar();
 } 
