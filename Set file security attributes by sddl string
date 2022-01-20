@@ -1,0 +1,69 @@
+#include <windows.h>
+#include <sddl.h>
+#include <stdio.h>
+#include <winternl.h>
+#pragma comment(lib, "ntdll.lib")
+
+BOOL CreateMyDACL(SECURITY_ATTRIBUTES* pSA,CHAR* szSD)
+{
+    if (NULL == pSA)
+        return FALSE;
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorA( 
+        szSD,
+        SDDL_REVISION_1,
+        &(pSA->lpSecurityDescriptor),
+        NULL)) {
+            printf("Failed CreateMyDACL\n");
+            getchar();
+            exit(1);
+    }
+}
+
+void main()
+{
+    SECURITY_ATTRIBUTES  sa;
+    SECURITY_ATTRIBUTES  sa2;
+
+    
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.bInheritHandle = FALSE;
+
+    sa2.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa2.bInheritHandle = FALSE;
+
+    OBJECT_ATTRIBUTES	oa = { 0 };
+    IO_STATUS_BLOCK		IoStatus = { 0 };
+    UNICODE_STRING		us;
+    HANDLE HD;
+
+    if (!CreateMyDACL(&sa, (CHAR*)"D:(D;;DT;;;WD)(A;;GA;;;WD)"))
+    {
+        printf("Failed CreateMyDACL\n");
+        getchar();
+        exit(1);
+    }
+
+    CreateDirectoryA("C:\\ProgramData\\test0", &sa);
+
+
+    if (!CreateMyDACL(&sa2, (CHAR*)"D:(A;;GR;;;WD)(A;;GA;;;BA)(A;;0;;;OW)"))
+    {
+        printf("Failed CreateMyDACL\n");
+        getchar();
+        exit(1);
+    }
+
+    RtlInitUnicodeString(&us, L"\\??\\C:\\ProgramData\\test0\\eses23.txt");
+
+    oa.ObjectName = &us;
+    oa.SecurityDescriptor = &sa2;
+    oa.Attributes = OBJ_CASE_INSENSITIVE;
+    oa.Length = sizeof(OBJECT_ATTRIBUTES);
+
+ 
+    HANDLE hFILE = CreateFileA("C:\\ProgramData\\test0\\eses23.txt", GENERIC_WRITE, 0, &sa2, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    getchar();
+} 
+
+
