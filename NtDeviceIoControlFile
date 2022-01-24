@@ -1,3 +1,5 @@
+//一个DeviceIoControl调用，只是用与自己复制过来测试
+
 #include<stdio.h>
 #include <windows.h>
 typedef struct _IO_STATUS_BLOCK {
