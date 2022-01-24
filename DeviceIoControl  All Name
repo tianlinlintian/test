@@ -1,11 +1,16 @@
-//获得当前进程可以打开驱动设备通信接口名字 要查看名字所在驱动可在DeviceIoControl调用之前设置了一个 __debugbreak()断点
+//目的：获得当前进程所有可以打开的驱动设备名以及设备连接
+
+//要查看名字所在的驱动可在DeviceIoControl调用之前设置了一个 __debugbreak()断点
 //还需要设置cpu为单核，命中 __debugbreak()断点后继续对bp nt!IofCallDriver下断点然后按g放行
 //nt!IofCallDriver断下后，一直按t单步跟，跟不了多久就会进入目标驱动的ioctl派遣函数（也就是nt!guard_dispatch_icall消失的时候）
-//因为还有部分驱动在Createl派遣函数中也就是在打开设备时进行了了判断,
-//比如WS2IFSL，需要调用NtCreateFile设置扩展属性,参见https://github.com/bluefrostsecurity/CVE-2019-1215/blob/master/CVE-2019-1215-ws2ifsl/exploit.cpp
-//所以为了包含所有可能的结果即使在打开设备时出错但只要不是拒绝访问或者没有设置IRP_MJ_CREATE,设备无效就打印错误值 以及设备名，这种情况需要自己去分析
+
+//因为还有部分驱动在IRP_MJ_CREATE派遣函数中也就是在打开设备时进行了了判断,比如WS2IFSL.sys(一个例子是CVE-2019-1215)
+//所以为了包含所有可能的结果即使在打开设备时出错但只要不是拒绝访问或者没有设置IRP_MJ_CREATE,设备无效那么就打印错误值 以及设备名，这种情况需要自己去驱动的IRP_MJ_CREATE分析
+
 //关于ioctl定位通过对IofCompleteRequest交叉引用即可
 
+//由于只是获得通信名字，进一步发送ioctl需要拥有权限(https://docs.microsoft.com/en-us/windows-hardware/drivers/storage/acls-and-the-device-stack)
+//如果以成功发送ioctl为目的，从方便角度上看，MAXIMUM_ALLOWED改为GENERIC_WRITE | MAXIMUM_ALLOWED是更好的选择
 
 
 
