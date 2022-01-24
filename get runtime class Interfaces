@@ -1,3 +1,5 @@
+//获取时间运行时接口 本例用到的接口5474a982-e485-45bd-bb9c-d8fcce05ba7e为uuid,运行时间类名WindowsUpdate.Internal.InstallControl
+
 #include<stdio.h>
 #include<windows.h>
 #include<comdef.h>
