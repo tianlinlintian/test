@@ -1,4 +1,6 @@
 //移除有protection标志的进程(PPL保护机制)，为了process explorer ,rpcview 等工具能查看正在运行的所有进程信息
+//不同的系统需要更改结构偏移 默认21h1
+
 #include <ntddk.h>
 #define pid_offset  0x440
 #define list_offset  0x448
