@@ -7,6 +7,8 @@
 //关于ioctl定位通过对IofCompleteRequest交叉引用即可
 
 
+
+
 #include "windows.h"
 #include "stdio.h"
 
@@ -135,9 +137,10 @@ int Recur(HANDLE hDirectory, wchar_t* DirName, int LevelX)
 					wcscat_s(FullObjName, Name);
 					memcpy_s(path, MAX_PATH, L"\\\\.\\GLOBALROOT\\Device", MAX_PATH);
 					wcscat_s(path, FullObjName);
-					HANDLE hDriver = CreateFileW(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
 
-					
+					HANDLE hDriver = CreateFileW(path, MAXIMUM_ALLOWED, 0, NULL, OPEN_EXISTING, 0, NULL);
+
+
 					if (hDriver != INVALID_HANDLE_VALUE) {
 						printf("%S\n", path);
 					}
@@ -223,12 +226,12 @@ int main()
 			char* test = &buf[i + 1];
 			strcat_s(path, test);
 
-			hDriver = CreateFileA(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
-			
+			hDriver = CreateFileA(path, MAXIMUM_ALLOWED, 0, NULL, OPEN_EXISTING, 0, NULL);
+
 			if (hDriver != INVALID_HANDLE_VALUE) {
 				printf("%s\n", path);
 			}
-			else if (GetLastError() > 5&& GetLastError()!=31)
+			else if (GetLastError() > 5 && GetLastError() != 31)
 			{
 				printf("%s   需要进一步分析，错误值%d\n", path, GetLastError());
 			}
