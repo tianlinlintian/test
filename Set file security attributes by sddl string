@@ -1,5 +1,6 @@
-//查看文件dacl可以在powershlel
+//通过sddl字符串来设置文件安全属性，强大但不是很方便，获取需要的sddl字符串可以自己提前设置一个文件然后拷贝该文件的sddl
 
+//查看文件Sddl可以使用powershlel命令
 //$acl = Get-Acl 文件名
 //$acl.Sddl
 
