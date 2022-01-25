@@ -64,6 +64,9 @@ int main()
     SetPrivilege(token, L"SeDebugPrivilege", 1);
 
     DWORD dwPId = 0;
+    DWORD n = 0;
+    DWORD y = 0;
+
     HANDLE pFile;
     DWORD fileSize;
     char* buffer, * tmpBuf;
@@ -71,6 +74,14 @@ int main()
 
     printf("请输入目标进程ID：");
     scanf_s("%ud", &dwPId);
+
+
+    printf("请输入需要包括的年份ID：");
+    scanf_s("%ud", &n);
+
+    //printf("请输入需要包括的月份ID：");
+    //scanf_s("%ud", &y);
+
 
     HANDLE        hModuleSnap = INVALID_HANDLE_VALUE;
     MODULEENTRY32 me32 = { sizeof(MODULEENTRY32) };
@@ -113,8 +124,11 @@ int main()
         FileTimeToSystemTime(&localTime, &sysTime);
 
         CString strTime;
-
-        printf("%S   修改时间%4d年%2d月%2d日\n", lpFileName, sysTime.wYear, sysTime.wMonth, sysTime.wDay);
+        if (sysTime.wYear==n)
+        {
+            printf("%S   修改时间%4d年%2d月%2d日\n", lpFileName, sysTime.wYear, sysTime.wMonth, sysTime.wDay);
+        }
+       
     } while (Module32Next(hModuleSnap, &me32));
 
     CloseHandle(hModuleSnap);
