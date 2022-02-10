@@ -154,7 +154,7 @@ void main()
 	info.MaxMessageLength = 1400;
 	UNICODE_STRING usPort;
 
-	RtlInitUnicodeString(&usPort, L"\\WindowsErrorReportingServicePort");
+	RtlInitUnicodeString(&usPort, L"\\SleepstudyControlPort");
 
 	ntRet = NtAlpcConnectPort(&hPort, &usPort, 0, &info, 0, NULL, NULL, NULL, NULL, NULL, NULL);
 
@@ -164,7 +164,7 @@ void main()
 	}
 	else
 	{
-		printf("[-] ConnectPort error %d \n", GetLastError());
+		printf("[-] ConnectPort error %d \n", ntRet);
 	}
 
 	RtlSecureZeroMemory(&pmSend, sizeof(pmSend));
@@ -182,7 +182,7 @@ void main()
 	}
 	else
 	{
-		printf("[-] NtAlpcSendWaitReceivePort error %d \n", GetLastError());
+		printf("[-] NtAlpcSendWaitReceivePort error %d \n", ntRet);
 	}
 
 	getchar();
