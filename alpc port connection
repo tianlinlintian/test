@@ -127,8 +127,7 @@ extern "C" int NTAPI  NtAlpcCreatePort(
 );
 
 
-
-#define MSG_LEN 0x550
+#define MSG_LEN 64
 
 LPVOID CreateMsgMem(PPORT_MESSAGE PortMessage, SIZE_T MessageSize, LPVOID Message)
 {
@@ -154,7 +153,7 @@ void main()
 	info.MaxMessageLength = 1400;
 	UNICODE_STRING usPort;
 
-	RtlInitUnicodeString(&usPort, L"\\SleepstudyControlPort");
+	RtlInitUnicodeString(&usPort, L"\\SeLsaCommandPort");
 
 	ntRet = NtAlpcConnectPort(&hPort, &usPort, 0, &info, 0, NULL, NULL, NULL, NULL, NULL, NULL);
 
@@ -164,7 +163,7 @@ void main()
 	}
 	else
 	{
-		printf("[-] ConnectPort error %d \n", ntRet);
+		printf("[-] ConnectPort error %x \n", ntRet);
 	}
 
 	RtlSecureZeroMemory(&pmSend, sizeof(pmSend));
@@ -182,7 +181,7 @@ void main()
 	}
 	else
 	{
-		printf("[-] NtAlpcSendWaitReceivePort error %d \n", ntRet);
+		printf("[-] NtAlpcSendWaitReceivePort error %x \n", ntRet);
 	}
 
 	getchar();
