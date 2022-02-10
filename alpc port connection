@@ -1,0 +1,190 @@
+//alpc端口连接 以错误报告服务创建的端口名WindowsErrorReportingServicePort为例
+
+#include <windows.h>
+#include <stdio.h>
+#include <windef.h>
+#include <Psapi.h>
+#include <winternl.h>
+#pragma comment(lib, "ntdll")
+
+#pragma warning(disable:4996)
+
+
+typedef struct _ALPC_PORT_ATTRIBUTES
+{
+	ULONG Flags;
+	SECURITY_QUALITY_OF_SERVICE SecurityQos;
+	SIZE_T MaxMessageLength;
+	SIZE_T MemoryBandwidth;
+	SIZE_T MaxPoolUsage;
+	SIZE_T MaxSectionSize;
+	SIZE_T MaxViewSize;
+	SIZE_T MaxTotalSectionSize;
+	ULONG DupObjectTypes;
+#ifdef _WIN64
+	ULONG Reserved;
+#endif
+} ALPC_PORT_ATTRIBUTES, * PALPC_PORT_ATTRIBUTES;
+
+
+typedef short CSHORT;
+
+typedef struct _PORT_MESSAGE
+{
+	union
+	{
+		struct
+		{
+			CSHORT DataLength;
+			CSHORT TotalLength;
+		} s1;
+		ULONG Length;
+	} u1;
+	union
+	{
+		struct
+		{
+			CSHORT Type;
+			CSHORT DataInfoOffset;
+		} s2;
+		ULONG ZeroInit;
+	} u2;
+	union
+	{
+		CLIENT_ID ClientId;
+		double DoNotUseThisField;
+	};
+	ULONG MessageId;
+	union
+	{
+		SIZE_T ClientViewSize; // only valid for LPC_CONNECTION_REQUEST messages
+		ULONG CallbackId; // only valid for LPC_REQUEST messages
+	};
+} PORT_MESSAGE, * PPORT_MESSAGE;
+
+typedef struct _ALPC_MESSAGE_ATTRIBUTES
+{
+	ULONG AllocatedAttributes;
+	ULONG ValidAttributes;
+} ALPC_MESSAGE_ATTRIBUTES, * PALPC_MESSAGE_ATTRIBUTES;
+
+extern "C" int NTAPI NtDeleteKey(HKEY);
+
+extern "C" int NTAPI NtAlpcConnectPort(
+	_Out_ PHANDLE PortHandle,
+	_In_ PUNICODE_STRING PortName,
+	POBJECT_ATTRIBUTES ObjectAttributes,
+	PALPC_PORT_ATTRIBUTES PortAttributes,
+	_In_ ULONG Flags,
+	_In_opt_ PSID RequiredServerSid,
+	_Inout_updates_bytes_to_opt_(*BufferLength, *BufferLength) PPORT_MESSAGE ConnectionMessage,
+	_Inout_opt_ PULONG BufferLength,
+	_Inout_opt_ PALPC_MESSAGE_ATTRIBUTES OutMessageAttributes,
+	_Inout_opt_ PALPC_MESSAGE_ATTRIBUTES InMessageAttributes,
+	_In_opt_ PLARGE_INTEGER Timeout
+);
+
+extern "C" int NTAPI NtAlpcSendWaitReceivePort(
+	_In_ HANDLE PortHandle,
+	_In_ ULONG Flags,
+	_In_reads_bytes_opt_(SendMessage->u1.s1.TotalLength) PPORT_MESSAGE SendMessage,
+	_Inout_opt_ PALPC_MESSAGE_ATTRIBUTES SendMessageAttributes,
+	_Out_writes_bytes_to_opt_(*BufferLength, *BufferLength) PPORT_MESSAGE ReceiveMessage,
+	_Inout_opt_ PSIZE_T BufferLength,
+	_Inout_opt_ PALPC_MESSAGE_ATTRIBUTES ReceiveMessageAttributes,
+	_In_opt_ PLARGE_INTEGER Timeout
+);
+
+extern "C" int NTAPI NtAlpcDisconnectPort(
+	_In_ HANDLE PortHandle,
+	_In_ ULONG Flags
+);
+
+extern "C" int NTAPI AlpcInitializeMessageAttribute(
+	ULONG TypeFlag,
+	PVOID pMessageBuffer OPTIONAL,
+	ULONG BuffSize,
+	PULONG RequireSize
+);
+
+extern "C" int NTAPINtAlpcAcceptConnectPort(
+	_Out_ PHANDLE PortHandle,
+	_In_ HANDLE ConnectionPortHandle,
+	_In_ ULONG Flags,
+	_In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+	_In_opt_ PALPC_PORT_ATTRIBUTES PortAttributes,
+	_In_opt_ PVOID PortContext,
+	_In_reads_bytes_(ConnectionRequest->u1.s1.TotalLength) PPORT_MESSAGE ConnectionRequest,
+	_Inout_opt_ PALPC_MESSAGE_ATTRIBUTES ConnectionMessageAttributes,
+	_In_ BOOLEAN AcceptConnection
+);
+
+
+extern "C" int NTAPI  NtAlpcCreatePort(
+	_Out_ PHANDLE PortHandle,
+	_In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+	_In_opt_ PALPC_PORT_ATTRIBUTES PortAttributes
+);
+
+
+
+#define MSG_LEN 0x550
+
+LPVOID CreateMsgMem(PPORT_MESSAGE PortMessage, SIZE_T MessageSize, LPVOID Message)
+{
+	LPVOID lpMem = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, MessageSize + sizeof(PORT_MESSAGE));
+	memmove(lpMem, PortMessage, sizeof(PORT_MESSAGE));
+	memmove((BYTE*)lpMem + sizeof(PORT_MESSAGE), Message, MessageSize);
+	return(lpMem);
+}
+
+
+void main()
+{
+	PORT_MESSAGE    pmSend;
+	PORT_MESSAGE    pmReceive = { 0 };
+	NTSTATUS        ntRet;
+	BOOLEAN         bBreak;
+	SIZE_T          nLen;
+	HANDLE          hPort;
+	LPVOID          lpMem;
+	DWORD           szInput[MSG_LEN + 1];
+
+	ALPC_PORT_ATTRIBUTES  info = { 0 };
+	info.MaxMessageLength = 1400;
+	UNICODE_STRING usPort;
+
+	RtlInitUnicodeString(&usPort, L"\\WindowsErrorReportingServicePort");
+
+	ntRet = NtAlpcConnectPort(&hPort, &usPort, 0, &info, 0, NULL, NULL, NULL, NULL, NULL, NULL);
+
+	if (!ntRet)
+	{
+		printf("[+] ConnectPort ok \n");
+	}
+	else
+	{
+		printf("[-] ConnectPort error %d \n", GetLastError());
+	}
+
+	RtlSecureZeroMemory(&pmSend, sizeof(pmSend));
+	RtlSecureZeroMemory(&szInput, MSG_LEN);
+	szInput[0] = 0xF0030002;
+	pmSend.u1.s1.DataLength = MSG_LEN;
+	pmSend.u1.s1.TotalLength = MSG_LEN + 0x28;
+	lpMem = CreateMsgMem(&pmSend, pmSend.u1.s1.DataLength, &szInput);
+
+	ntRet = NtAlpcSendWaitReceivePort(hPort, 0, (PPORT_MESSAGE)lpMem, NULL, NULL, NULL, NULL, NULL);
+
+	if (!ntRet)
+	{
+		printf("[+] NtAlpcSendWaitReceivePort ok \n");
+	}
+	else
+	{
+		printf("[-] NtAlpcSendWaitReceivePort error %d \n", GetLastError());
+	}
+
+	getchar();
+
+}
