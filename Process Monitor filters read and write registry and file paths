@@ -303,6 +303,7 @@ int main(int argc, char* argv[])
 						wchar_t  Dirw[0x1000];
 						swprintf(Dirw, 0x1000, L"%hs", Dir);
 
+
 						//为了能创建符号链接，必须先确保该目录下没有文件 否则设置挂载点将会返回错误145 
 	
 						if (!TraverseDirectory(Dirw))
@@ -329,6 +330,7 @@ int main(int argc, char* argv[])
 	    num = 0;
 	    indx = 0;
 	}
+
 
 	fclose(fp);
 	return 0;
