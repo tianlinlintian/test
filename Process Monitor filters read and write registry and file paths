@@ -1,0 +1,335 @@
+//使用本程序需要先使用Process Monitor保存的事件到文件，使用CSV格式，默认文件名为Logfile.CSV
+//此程序会将.CSV中的所有路径遍历 并判断注册表路径和文件路径是否对当前进程可以访问，能访问则打印
+
+#include <sddl.h>
+#include <aclapi.h>
+#include <stdio.h>
+#include <time.h> 
+#include <windows.h> 
+#include <Strsafe.h>
+#pragma comment(lib,"ws2_32.lib")
+#pragma warning(disable:4996)
+
+
+int EnableFileAccountPrivilege(const CHAR* pszPath, const CHAR* pszAccount)
+{
+	BOOL bSuccess = TRUE;
+	EXPLICIT_ACCESSA ea;
+	PACL pNewDacl = NULL;
+	PACL pOldDacl = NULL;
+	do
+	{
+		// 获取文件(夹)安全对象的DACL列表
+
+		if (ERROR_SUCCESS != GetNamedSecurityInfoA(pszPath, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, &pOldDacl, NULL, NULL))
+		{
+			bSuccess = FALSE;
+			break;
+		}
+
+		// 此处不可直接用AddAccessAllowedAce函数,因为已有的DACL长度是固定,必须重新创建一个DACL对象
+
+		// 生成指定用户帐户的访问控制信息(这里指定赋予全部的访问权限)
+
+		::BuildExplicitAccessWithNameA(&ea, (CHAR*)pszAccount, GENERIC_ALL, GRANT_ACCESS, SUB_CONTAINERS_AND_OBJECTS_INHERIT);
+
+		// 创建新的ACL对象(合并已有的ACL对象和刚生成的用户帐户访问控制信息)
+
+		if (ERROR_SUCCESS != ::SetEntriesInAclA(1, &ea, pOldDacl, &pNewDacl))
+		{
+			bSuccess = FALSE;
+			break;
+		}
+
+		// 设置文件(夹)安全对象的DACL列表
+		if (ERROR_SUCCESS != ::SetNamedSecurityInfoA((CHAR*)pszPath, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, pNewDacl, NULL))
+		{
+			bSuccess = FALSE;
+		}
+
+		//还原原来的安全属性
+		SetNamedSecurityInfoA((CHAR*)pszPath, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, pOldDacl, NULL);
+
+	} while (FALSE);
+
+	if (NULL != pNewDacl)
+	{
+		::LocalFree(pNewDacl);
+	}
+
+	return bSuccess;
+}
+
+//判断是否有WRITE_DAC权限
+BOOL IsDirectoryWrite(CHAR* filePath)
+{
+	if (EnableFileAccountPrivilege(filePath, "Everyone"))
+	{
+		return 1;
+	}
+	return 0;
+}
+
+
+//传入要遍历的文件夹路径 查看是否能够DELETE该文件夹下的所有文件
+BOOL TraverseDirectory(wchar_t Dir[MAX_PATH])
+{
+	WIN32_FIND_DATA FindFileData;
+	HANDLE hFind = INVALID_HANDLE_VALUE;
+	wchar_t DirSpec[MAX_PATH];                  //定义要遍历的文件夹的目录
+	DWORD dwError;
+	StringCchCopy(DirSpec, MAX_PATH, Dir);
+	StringCchCat(DirSpec, MAX_PATH, TEXT("\\*"));   //定义要遍历的文件夹的完整路径\*
+
+	hFind = FindFirstFile(DirSpec, &FindFileData);          //找到文件夹中的第一个文件
+
+	if (hFind == INVALID_HANDLE_VALUE)                               //如果hFind句柄创建失败，输出错误信息
+	{
+		FindClose(hFind);
+
+		return 0;
+	}
+	else
+	{
+		while (FindNextFile(hFind, &FindFileData) != 0)                            //当文件或者文件夹存在时
+		{
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 && wcscmp(FindFileData.cFileName, L".") == 0 || wcscmp(FindFileData.cFileName, L"..") == 0)        //判断是文件夹&&表示为"."||表示为"."
+			{
+				continue;
+			}
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)      //判断如果是文件夹
+			{
+
+				wchar_t DirAdd[MAX_PATH];
+				StringCchCopy(DirAdd, MAX_PATH, Dir);
+				StringCchCat(DirAdd, MAX_PATH, TEXT("\\"));
+				StringCchCat(DirAdd, MAX_PATH, FindFileData.cFileName);       //拼接得到此文件夹的完整路径
+				//如果是这次操作irp的文件目录则直接无视
+
+				if (TraverseDirectory(DirAdd) == 0) //实现递归调用
+				{
+					return 0;
+				}
+				HANDLE hFile = CreateFileW(DirAdd,      //第一个参数:路径
+					DELETE,                       //打开方式:
+					FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ,                                  //共享模式  
+					NULL,
+					OPEN_EXISTING,                      //打开已存在的文件
+					FILE_FLAG_BACKUP_SEMANTICS,         //FILE_FLAG_BACKUP_SEMANTICS表示为目录，NULL表示文件
+					NULL);
+				if (hFile == INVALID_HANDLE_VALUE)
+				{
+					return 0;
+				}
+				CloseHandle(hFile);
+			}
+
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)    //如果不是文件夹
+			{
+				WCHAR path[1000] = { 0 };
+				wcscpy(path, Dir);
+				wcscat(path, L"\\");
+				wcscat(path, FindFileData.cFileName);
+				HANDLE hFILE = CreateFileW(path, DELETE, FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+				if (hFILE == INVALID_HANDLE_VALUE)
+				{
+					return 0;
+				}
+				CloseHandle(hFILE);
+			}
+		}
+		FindClose(hFind);
+	}
+
+	return 1;
+}
+
+int main(int argc, char* argv[])
+{
+
+	FILE* fp;
+
+	char* str = (char*)malloc(0x1000);
+
+	if ((fp = fopen("Logfile.CSV", "r")) == NULL) {
+		puts("Fail to open file!");
+		exit(0);
+	}
+
+	int flag = 0, count = 0;
+
+	while (!feof(fp))
+	{
+		flag = fgetc(fp);
+		if (flag == '\n')
+			count++;
+	}
+
+	fseek(fp, 0, SEEK_SET);
+
+	for (size_t i = 0; i < count; i++)
+	{
+		fgets(str, 0x1000, fp);
+
+		int num = 0;
+		int indx = 0;
+
+		for (size_t j = 0; j < 0x1000; j++)
+		{
+			if (str[j] == ',')
+			{
+				num++;
+			}
+			if (num == 3)
+			{
+				indx = j + 3;
+			}
+			if (num == 5)
+			{
+				str[j-1] = 0;
+
+				//打印路径
+				//printf("%s\n", &str[indx]);
+
+				//如果是注册表路径
+				if (str[indx]=='H')
+				{
+					HKEY hKey;
+					ULONG	disp;
+					ULONG retdelete;
+					ULONG retcreate;
+					//对HKU以及HKCU不感兴趣 因为注册表符号链接仅对当前根项有效 如果有别的需要可以删除这个过滤代码
+					if (str[indx + 2] == 'U'||
+						(str[indx + 2] == 'C' &&str[indx + 3] == 'U'))
+					{
+						break;
+					}
+					else if (str[indx + 2] == 'L' && str[indx + 3] == 'M')
+					{
+						retdelete = RegDeleteKeyA(HKEY_LOCAL_MACHINE, &str[indx + 5]);
+
+						retcreate = RegCreateKeyExA(HKEY_LOCAL_MACHINE, &str[indx + 5],
+							0, 0, 0, KEY_ALL_ACCESS, 0, &hKey, &disp);
+
+					}
+					else if (str[indx + 2] == 'C' && str[indx + 3] == 'R')
+					{
+						retdelete = RegDeleteKeyA(HKEY_CLASSES_ROOT, &str[indx + 5]);
+
+						retcreate = RegCreateKeyExA(HKEY_CLASSES_ROOT, &str[indx + 5],
+							0, 0, 0, KEY_ALL_ACCESS, 0, &hKey, &disp);
+					}
+
+					else if (str[indx + 2] == 'C' && str[indx + 3] == 'C')
+					{
+						retdelete = RegDeleteKeyA(HKEY_CURRENT_CONFIG, &str[indx + 5]);
+
+						retcreate = RegCreateKeyExA(HKEY_CURRENT_CONFIG, &str[indx + 5],
+							0, 0, 0, KEY_ALL_ACCESS, 0, &hKey, &disp);
+					}
+					//如果能创建或者能删除就打印
+					if (retdelete ==ERROR_SUCCESS&& retcreate == ERROR_SUCCESS)
+					{
+						printf("%s 可以被删除和创建\n", &str[indx]);
+					}
+					else if(retdelete == ERROR_SUCCESS)
+					{
+						printf("%s 可以被删除 \n", &str[indx]);
+					}
+					else if (retcreate == ERROR_SUCCESS)
+					{
+						printf("%s 可以被创建 \n", &str[indx]);
+					}
+				}
+				//如果是文件路径
+				else
+				{
+					//是否能创建该文件所在的目录 如果目录已存在再进一步判断
+					char Dir[0x1000];
+					memcpy(Dir, &str[indx], strlen(&str[indx]));
+
+					for (size_t i = strlen(Dir); i > 0; i--)
+					{
+						if (Dir[i] == '\\')
+						{
+							Dir[i] = 0;
+							break;
+						}
+					}
+
+					HANDLE hFILE = 0;
+					ULONG ret = 0;
+					CreateDirectoryA(Dir, 0);
+					ULONG er = GetLastError();
+					//如果文件所在目录不存在那么则往上级一层层创建直到创建成功或者提示拒绝访问
+					if (er == 2 || er == 3)
+					{
+						while (true)
+						{
+							for (size_t i = strlen(Dir); i > 0; i--)
+							{
+								if (Dir[i] == '\\')
+								{
+									Dir[i] = 0;
+									break;
+								}
+							}
+							CreateDirectoryA(Dir, 0);
+							ULONG er = GetLastError();
+							if (er != 2 && er != 3)
+							{
+								//	printf("%d\n", er);
+								break;
+							}
+							//该文件所在目录没有写入权限 不做记录
+							else if (er == 5)
+							{
+								break;
+							}
+						}
+					}
+
+					if (er != 0 && er != 5)
+					{
+						hFILE = CreateFileA(Dir, DELETE, FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+
+						//如果没有DELETE权限也没有WRITE_DAC权限
+						if (hFILE == INVALID_HANDLE_VALUE&&!IsDirectoryWrite(Dir))
+						{
+							//该文件所在目录没有写入权限 不做记录
+							break;
+						}
+			
+						wchar_t  Dirw[0x1000];
+						swprintf(Dirw, 0x1000, L"%hs", Dir);
+
+						//为了能创建符号链接，必须先确保该目录下没有文件 否则设置挂载点将会返回错误145 
+	
+						if (!TraverseDirectory(Dirw))
+						{
+							printf("%s 该文件所在目录下有部分文件没有写入权限或者正在被其他程序独占中  \n", &str[indx]);
+							break;
+						}
+						//该文件所在目录可以设置符号链接
+						else
+						{
+							printf("%s 该文件所在目录可以设置符号链接  \n", &str[indx]);
+						}
+						CloseHandle(hFILE);
+					}
+					else if( er == 0)
+					{
+						printf("%s 该文件所在目录可以设置符号链接  \n", &str[indx]);
+					}
+				}
+				break;
+			}
+		}
+
+	    num = 0;
+	    indx = 0;
+	}
+
+	fclose(fp);
+	return 0;
+}
