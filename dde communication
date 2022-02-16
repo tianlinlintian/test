@@ -1,0 +1,78 @@
+//https://blog.haboob.sa/blog/exploring-acrobat-ddes-attack-surface观后写
+//找dde通信点对DdeAccessData交叉引用即可
+//该代码没有考虑代码页问题
+
+#include <stdio.h>
+#include <windows.h>
+#include <hstring.h>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <string>
+#include <string.h>
+#include <windows.h>
+#include <strsafe.h>
+#include <tlhelp32.h>
+#pragma warning(disable:4996)
+
+using namespace std;
+
+
+ULONG DdeCallback(UINT iType, UINT iFmt, HCONV hCconv, HSZ hsz1, HSZ hsz2, HDDEDATA hData, DWORD dwData1, DWORD dwData2)
+{
+    return 0;
+}
+
+
+int main(int argc, char* argv[]) {
+
+    DWORD id=0;
+    
+    if (DMLERR_NO_ERROR == DdeInitializeA(&id, (PFNCALLBACK)&DdeCallback, APPCMD_CLIENTONLY, 0))
+    {
+        printf("DdeInitialize ok \n");
+    } 
+    else
+    {
+        printf("DdeInitialize error %x\n", DdeGetLastError(id));
+    }
+
+    HSZ hszServerName = DdeCreateStringHandleW(id, L"Acrobat Search", 0);
+
+    HSZ hszTopicName = DdeCreateStringHandleW(id, L"Acrobat Search", 0);
+
+    HCONV hConv = DdeConnect(id, hszServerName, hszTopicName,0);
+
+    if (hConv)
+    {
+        printf("DdeConnect ok \n");
+    }
+    else
+    {
+        printf("DdeConnect error %x\n", DdeGetLastError(id));
+        getchar();
+        exit(-1);
+    }
+
+    ULONG dwResult;
+
+    byte* date = (byte*)"Hello";
+
+    HSZ HzIndex = DdeCreateStringHandleA(id, "Index", 0);
+
+    HDDEDATA hDdeData = DdeClientTransaction(date, sizeof(date), hConv, HzIndex, CF_TEXT, XTYP_POKE, 1000, &dwResult);
+
+    if (!hDdeData)
+    {
+        printf("DdeClientTransaction error %x\n", DdeGetLastError(id));
+    }
+    else
+    {
+        printf("DdeClientTransaction ok \n");
+    }
+
+    DdeDisconnect(hConv);
+
+    getchar();
+
+}
