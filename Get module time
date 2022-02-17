@@ -1,3 +1,5 @@
+//打印目标进程中所加载的文件的修改时间
+
 #include <windows.h>
 #include <TlHelp32.h>
 #include <stdio.h>
@@ -91,7 +93,7 @@ int main()
         dwPId);
     if (hModuleSnap == INVALID_HANDLE_VALUE)
     {
-        printf("CreateToolhelp32Snapshot error %d \n",GetLastError());
+        printf("CreateToolhelp32Snapshot error %d \n", GetLastError());
         return false;
     }
 
@@ -101,11 +103,9 @@ int main()
         return false;
     }
     WCHAR lpFileName[MAX_PATH];
-    wcscpy(lpFileName, (WCHAR*)L"C:\\Windows\\System32\\");
+ 
     do {
-        wcscpy(lpFileName + wcslen(L"C:\\Windows\\System32\\"), me32.szModule);
-
-        pFile = CreateFileW(lpFileName, GENERIC_READ,
+        pFile = CreateFileW(me32.szExePath, GENERIC_READ,
             FILE_SHARE_READ,
             NULL,
             OPEN_EXISTING,
@@ -124,11 +124,12 @@ int main()
         FileTimeToSystemTime(&localTime, &sysTime);
 
         CString strTime;
-        if (sysTime.wYear==n)
+        if (sysTime.wYear == n)
         {
-            printf("%S   修改时间%4d年%2d月%2d日\n", lpFileName, sysTime.wYear, sysTime.wMonth, sysTime.wDay);
+            printf("%S   修改时间%4d年%2d月%2d日\n", me32.szExePath, sysTime.wYear, sysTime.wMonth, sysTime.wDay);
+
         }
-       
+
     } while (Module32Next(hModuleSnap, &me32));
 
     CloseHandle(hModuleSnap);
