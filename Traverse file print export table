@@ -1,0 +1,183 @@
+#include <stdio.h>
+#include <Strsafe.h>
+#include <Windows.h>
+#pragma warning (disable: 4996)
+using namespace std;
+// 文件已经读取到内存中了
+DWORD RVA_2_RAW(BYTE* buf, DWORD RVA, DWORD RAW, BOOL flag)				// RVA为导入表或导出表的RVA；flag为1，RVA转偏移，为0反过来——事实上此程序只用到了1
+{
+	PIMAGE_DOS_HEADER pDOS = (PIMAGE_DOS_HEADER)buf;					// 获取DOS头，pDos为PIMAGE_DOS_HEADER结构体的实例,buf则指向PE文件的基地址
+	PIMAGE_NT_HEADERS pNT = (PIMAGE_NT_HEADERS)(buf + pDOS->e_lfanew);	// 获取NT头，pNT为PIMAGE_DOS_HEADER的实例，DOS头的e_lfanew成员指示了NT头的偏移量
+	PIMAGE_SECTION_HEADER pSection = (PIMAGE_SECTION_HEADER)(buf + pDOS->e_lfanew + 0x18 + pNT->FileHeader.SizeOfOptionalHeader);
+	// 获取区块表头，pSection为PIMAGE_SECTION_HEADER的实例
+	// +0x18指向了可选头，加上可选头的大小即指向了Section表头的首部，可选头的大小存放在文件头的成员中
+
+	DWORD SectionNumber = pNT->FileHeader.NumberOfSections;							// 通过文件头获取区块数（节区数）
+	DWORD SizeOfAllHeadersAndSectionList = pNT->OptionalHeader.SizeOfHeaders;		// 所有头(DOS+NT)+区块表的大小，是一个大小而不是地址
+	DWORD Imp_Exp_FA = 0;															// 导入导出表在磁盘文件中的地址
+	DWORD SectionRVA = 0;															// 暂存每个节区表的RVA
+
+	int i = 0;
+	if (flag)
+	{
+		if (RVA < SizeOfAllHeadersAndSectionList)									// 如果导入导出表的RVA连节区表都没出，直接返回，因为(DOS+NT头+节区表)在内存中不展开
+		{
+			Imp_Exp_FA = RVA;
+		}
+		for (; i < SectionNumber; i++)												// 有多少节区就循环几次，从第一个节区表开始操作，如果PE文件有N个节，那么区块表就是由N个IMAGE_SECTION_HEADER组成的数组
+		{
+			SectionRVA = pSection[i].VirtualAddress;								// 该区块加载到内存中的RVA
+			// 计算该导入导出表的RVA位于哪个区块内
+			if (RVA > SectionRVA && SectionRVA + pSection[i].Misc.VirtualSize > RVA)// &&后面为：该区块的RVA(该区块在内存中的起始地址) + 该区块没有对齐处理之前的实际大小(磁盘中的大小。Misc是共用体)
+			{
+				Imp_Exp_FA = RVA - SectionRVA + pSection[i].PointerToRawData;				// （导入导出表的RVA - 所在节区的基址）得到导入导出表相对该节区的偏移量offset，然后offset + 该节区在磁盘文件中的VA = FOA，得到了文件偏移地址(即导入导出表在磁盘文件中的地址)
+				break;																// 找到了就不再遍历节区了
+			}
+		}
+	}
+	else
+	{
+		if (RAW < SizeOfAllHeadersAndSectionList)									// 这里就是通过RAW求RVA了（该程序并未用到）  注意文件偏移地址就是在磁盘文件中的地址：RAW==FOA==FA   （其实一共就3个概念：VA RVA FA，分别是虚拟绝对地址，虚拟相对地址，文件绝对地址）
+		{
+			Imp_Exp_FA = RAW;
+		}
+		for (; i < SectionNumber; i++)
+		{
+			SectionRVA = pSection[i].PointerToRawData;
+			if (RAW > SectionRVA && SectionRVA + pSection[i].SizeOfRawData > RAW)
+			{
+				Imp_Exp_FA = RAW - SectionRVA + pSection[i].VirtualAddress;
+				break;
+			}
+		}
+	}
+	return Imp_Exp_FA;
+}
+
+
+BOOL TraverseDirectory(wchar_t Dir[MAX_PATH])
+{
+	WIN32_FIND_DATA FindFileData;
+	HANDLE hFind = INVALID_HANDLE_VALUE;
+	wchar_t DirSpec[MAX_PATH];                  //定义要遍历的文件夹的目录
+	DWORD dwError;
+	StringCchCopy(DirSpec, MAX_PATH, Dir);
+	StringCchCat(DirSpec, MAX_PATH, TEXT("\\*"));   //定义要遍历的文件夹的完整路径\*
+
+	hFind = FindFirstFile(DirSpec, &FindFileData);          //找到文件夹中的第一个文件
+
+	if (hFind == INVALID_HANDLE_VALUE)                               //如果hFind句柄创建失败，输出错误信息
+	{
+		FindClose(hFind);
+	}
+	else
+	{
+		while (FindNextFile(hFind, &FindFileData) != 0)                            //当文件或者文件夹存在时
+		{
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 && wcscmp(FindFileData.cFileName, L".") == 0 || wcscmp(FindFileData.cFileName, L"..") == 0)        //判断是文件夹&&表示为"."||表示为"."
+			{
+				continue;
+			}
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)      //判断如果是文件夹
+			{
+
+				wchar_t DirAdd[MAX_PATH];
+				StringCchCopy(DirAdd, MAX_PATH, Dir);
+				StringCchCat(DirAdd, MAX_PATH, TEXT("\\"));
+				StringCchCat(DirAdd, MAX_PATH, FindFileData.cFileName);       //拼接得到此文件夹的完整路径
+
+				if (TraverseDirectory(DirAdd) == 0) //实现递归调用
+				{
+					return 0;
+				}
+			}
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)    //如果不是文件夹
+			{
+
+				WCHAR p[1000] = { 0 };
+				wcscpy(p, Dir);
+				wcscat(p, L"\\");
+				wcscat(p, FindFileData.cFileName);
+              
+                ULONG fl = 1;
+           
+                HANDLE hFile = CreateFile(
+                    p,
+                    GENERIC_READ,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    NULL, OPEN_EXISTING,
+                    FILE_ATTRIBUTE_NORMAL
+                    , NULL
+                );
+                if (hFile)
+                {
+                    // 3.若打开文件成功，则获取文件的大小
+                    DWORD dwFileSize = GetFileSize(hFile, NULL);
+                    // 4.申请内存空间，用于存放文件数据
+                    BYTE* FileBuffer = new BYTE[dwFileSize];
+                    // 5.读取文件内容
+                    DWORD dwReadFile = 0;
+                    ReadFile(hFile, FileBuffer, dwFileSize, &dwReadFile, NULL);
+                    // 6.判断这个文件是不是一个有效的PE文件
+                    //    6.1 先检查DOS头中的MZ标记，判断e_magic字段是否为0x5A4D，或者是IMAGE_DOS_SIGNATURE
+                    DWORD dwFileAddr = (DWORD)FileBuffer;
+                    PIMAGE_DOS_HEADER DosHeader = (PIMAGE_DOS_HEADER)dwFileAddr;
+                    if (DosHeader)
+                    {
+                        if (DosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+                        {
+                            fl = 0;
+                            continue;
+                        }
+                    }
+                    
+                    //    6.2 若都通过的话再获取NT头所在的位置，并判断e_lfanew字段是否为0x00004550，
+                    //        或者是IMAGE_NT_SIGNATURE
+                    if (DosHeader->e_lfanew)
+                    {
+                        PIMAGE_NT_HEADERS NtHeader = (PIMAGE_NT_HEADERS)(dwFileAddr + DosHeader->e_lfanew);
+                        if (NtHeader)
+                        {
+                            if (NtHeader->Signature != IMAGE_NT_SIGNATURE)
+                            {
+                                fl = 0;
+                                continue;
+                            }
+                        }
+                    }
+                   
+                    if (fl)
+                    {
+                        PIMAGE_DOS_HEADER pDOS = (PIMAGE_DOS_HEADER)FileBuffer;
+                        PIMAGE_NT_HEADERS pNT = (PIMAGE_NT_HEADERS)(FileBuffer + pDOS->e_lfanew);
+                        DWORD ExportTableRVA = pNT->OptionalHeader.DataDirectory[0].VirtualAddress;					// 获得导出表的RVA，DataDirectory[1]是导入表，0是导出表
+                        DWORD ExportAPI_FA = RVA_2_RAW(FileBuffer, ExportTableRVA, 0, 1);									// 计算导出函数在磁盘文件中的地址
+                        IMAGE_EXPORT_DIRECTORY* pExportTable = (IMAGE_EXPORT_DIRECTORY*)(FileBuffer + ExportAPI_FA);		// 指向导出函数在磁盘文件中的地址
+
+                        PDWORD ExportAPIName_FA = (PDWORD)(FileBuffer + RVA_2_RAW(FileBuffer, pExportTable->AddressOfNames, 0, 1));					// 将 指向函数名地址表的RVA 转化为FA
+                        DWORD ExportAPINameOriginals_FA = (DWORD)(FileBuffer + RVA_2_RAW(FileBuffer, pExportTable->AddressOfNameOrdinals, 0, 1));		// 将 指向函数名序号表的RVA 转化为FA
+                        DWORD index = 0;
+                        printf("\n %S 导出表：\n", p);
+                        while (DWORD(ExportAPIName_FA + index) < ExportAPINameOriginals_FA)							// AddressOfNameOridinals（0x24）在结构体中的位置就在AddressOfNames(0x20)下面
+                        {
+                            printf("	%s\n", FileBuffer + RVA_2_RAW(FileBuffer, (DWORD)(*(ExportAPIName_FA + index)), 0, 1));
+                            index++;
+                        }
+                    }
+                }
+                
+				memset(p, 0, 1000);
+			}
+		}
+		FindClose(hFind);
+	}
+
+	return 1;
+}
+
+int main()
+{
+	TraverseDirectory((WCHAR*)L"C:\\Program Files\\Adobe\\Acrobat Reader DC\\Reader");
+
+	return 0;
+}
