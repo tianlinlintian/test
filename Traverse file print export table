@@ -1,6 +1,13 @@
+//查看Acrobat Reader DC 文件中的导出表
+//一种是遍历Acrobat Reader文件夹中所有文件的导出表 一种只差看Acrobat Reader进程加载的dll的导出表
+
+
+#include <windows.h>
+#include <TlHelp32.h>
 #include <stdio.h>
+#include <locale.h>
+#include <atlstr.h>
 #include <Strsafe.h>
-#include <Windows.h>
 #pragma warning (disable: 4996)
 using namespace std;
 // 文件已经读取到内存中了
@@ -175,9 +182,173 @@ BOOL TraverseDirectory(wchar_t Dir[MAX_PATH])
 	return 1;
 }
 
+
+BOOL SetPrivilege(
+    HANDLE hToken,          // access token handle
+    LPCTSTR lpszPrivilege,  // name of privilege to enable/disable
+    BOOL bEnablePrivilege   // to enable or disable privilege
+)
+{
+    TOKEN_PRIVILEGES tp;
+    LUID luid;
+
+    if (!LookupPrivilegeValueW(
+        NULL,            // lookup privilege on local system
+        lpszPrivilege,   // privilege to lookup 
+        &luid))        // receives LUID of privilege
+    {
+        printf("LookupPrivilegeValue error:  %d\n", GetLastError());
+        return FALSE;
+    }
+
+    tp.PrivilegeCount = 1;
+    tp.Privileges[0].Luid = luid;
+    if (bEnablePrivilege)
+        tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+    else
+        tp.Privileges[0].Attributes = 0;
+
+    // Enable the privilege or disable all privileges.
+
+    if (!AdjustTokenPrivileges(
+        hToken,
+        FALSE,
+        &tp,
+        sizeof(TOKEN_PRIVILEGES),
+        (PTOKEN_PRIVILEGES)NULL,
+        (PDWORD)NULL))
+    {
+        printf("AdjustTokenPrivileges error: %d\n", GetLastError());
+        return FALSE;
+    }
+
+    if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
+
+    {
+        printf("The token does not have the specified privilege. \n");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+
+VOID TraverseDirectory2(wchar_t Dir[MAX_PATH])
+{
+    ULONG fl = 1;
+
+    HANDLE hFile = CreateFileW(
+        Dir,
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        NULL, OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL
+        , NULL
+    );
+    if (hFile)
+    {
+        // 3.若打开文件成功，则获取文件的大小
+        DWORD dwFileSize = GetFileSize(hFile, NULL);
+        // 4.申请内存空间，用于存放文件数据
+        BYTE* FileBuffer = new BYTE[dwFileSize];
+        // 5.读取文件内容
+        DWORD dwReadFile = 0;
+        ReadFile(hFile, FileBuffer, dwFileSize, &dwReadFile, NULL);
+        // 6.判断这个文件是不是一个有效的PE文件
+        //    6.1 先检查DOS头中的MZ标记，判断e_magic字段是否为0x5A4D，或者是IMAGE_DOS_SIGNATURE
+        DWORD dwFileAddr = (DWORD)FileBuffer;
+        PIMAGE_DOS_HEADER DosHeader = (PIMAGE_DOS_HEADER)dwFileAddr;
+        if (DosHeader)
+        {
+            if (DosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+            {
+                fl = 0;
+            }
+        }
+
+        //    6.2 若都通过的话再获取NT头所在的位置，并判断e_lfanew字段是否为0x00004550，
+        //        或者是IMAGE_NT_SIGNATURE
+        if (DosHeader->e_lfanew)
+        {
+            PIMAGE_NT_HEADERS NtHeader = (PIMAGE_NT_HEADERS)(dwFileAddr + DosHeader->e_lfanew);
+            if (NtHeader)
+            {
+                if (NtHeader->Signature != IMAGE_NT_SIGNATURE)
+                {
+                    fl = 0;
+                }
+            }
+        }
+
+        if (fl)
+        {
+            PIMAGE_DOS_HEADER pDOS = (PIMAGE_DOS_HEADER)FileBuffer;
+            PIMAGE_NT_HEADERS pNT = (PIMAGE_NT_HEADERS)(FileBuffer + pDOS->e_lfanew);
+            DWORD ExportTableRVA = pNT->OptionalHeader.DataDirectory[0].VirtualAddress;					// 获得导出表的RVA，DataDirectory[1]是导入表，0是导出表
+            DWORD ExportAPI_FA = RVA_2_RAW(FileBuffer, ExportTableRVA, 0, 1);									// 计算导出函数在磁盘文件中的地址
+            IMAGE_EXPORT_DIRECTORY* pExportTable = (IMAGE_EXPORT_DIRECTORY*)(FileBuffer + ExportAPI_FA);		// 指向导出函数在磁盘文件中的地址
+
+            PDWORD ExportAPIName_FA = (PDWORD)(FileBuffer + RVA_2_RAW(FileBuffer, pExportTable->AddressOfNames, 0, 1));					// 将 指向函数名地址表的RVA 转化为FA
+            DWORD ExportAPINameOriginals_FA = (DWORD)(FileBuffer + RVA_2_RAW(FileBuffer, pExportTable->AddressOfNameOrdinals, 0, 1));		// 将 指向函数名序号表的RVA 转化为FA
+            DWORD index = 0;
+            printf("\n %S 导出表：\n", Dir);
+            while (DWORD(ExportAPIName_FA + index) < ExportAPINameOriginals_FA)							// AddressOfNameOridinals（0x24）在结构体中的位置就在AddressOfNames(0x20)下面
+            {
+                printf("	%s\n", FileBuffer + RVA_2_RAW(FileBuffer, (DWORD)(*(ExportAPIName_FA + index)), 0, 1));
+                index++;
+            }
+        }
+    }
+}
 int main()
 {
-	TraverseDirectory((WCHAR*)L"C:\\Program Files\\Adobe\\Acrobat Reader DC\\Reader");
+
+	//第一种:遍历Acrobat Reader DC\\Reader文件夹中所有文件的导出表
+	//TraverseDirectory((WCHAR*)L"C:\\Program Files\\Adobe\\Acrobat Reader DC\\Reader");
+
+    //第二种
+    HANDLE token;
+
+    OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS_P, &token);
+
+    SetPrivilege(token, L"SeDebugPrivilege", 1);
+
+	//遍历指定进程ID加载的文件的导出表
+    DWORD dwPId = 0;
+    printf("请输入目标进程ID：");
+    scanf_s("%ud", &dwPId);
+
+
+    HANDLE        hModuleSnap = INVALID_HANDLE_VALUE;
+    MODULEENTRY32 me32 = { sizeof(MODULEENTRY32) };
+
+    hModuleSnap = CreateToolhelp32Snapshot(
+        TH32CS_SNAPMODULE,
+        dwPId);
+    if (hModuleSnap == INVALID_HANDLE_VALUE)
+    {
+        printf("CreateToolhelp32Snapshot error %d \n", GetLastError());
+        return false;
+    }
+
+    if (!Module32First(hModuleSnap, &me32)) {
+        printf("Module32First error%d \n", GetLastError());
+        CloseHandle(hModuleSnap);
+        return false;
+    }
+    WCHAR lpFileName[MAX_PATH];
+
+    do {
+        //排除C\\Windows
+        if (!wcsstr(me32.szExePath,L"C:\\Windows"))
+        {
+            TraverseDirectory2(me32.szExePath);
+        }
+       
+
+    } while (Module32Next(hModuleSnap, &me32));
+
+    CloseHandle(hModuleSnap);
 
 	return 0;
 }
