@@ -28,22 +28,22 @@ int main() {
 			}
 		}
 		/*memcpy(path3, "sc create ", strlen("sc create "));
-		memcpy(path3 + strlen("sc create "), pNextInfo.cFileName, strlen(pNextInfo.cFileName));
-		strcat(path3, " binPath=C:\\Windows\\System32\\drivers\\");
+		strcat(path3, pNextInfo.cFileName);
+		strcat(path3, " binPath= C:\\Windows\\System32\\drivers\\");
 		strcat(path3, pNextInfo.cFileName);
 		strcat(path3, ".sys");
-		strcat(path3, " type=kernel start=auto");
+		strcat(path3, " type= kernel start= auto");
 
 		printf("command ：%s\n", path3);
 		system(path3);*/
 
-		memcpy(path + strlen("sc config "), pNextInfo.cFileName, strlen(pNextInfo.cFileName));
-		memcpy(path + strlen("sc config ") + strlen(pNextInfo.cFileName), " start= auto", strlen(" start= auto"));
+		strcat(path,pNextInfo.cFileName);
+		strcat(path, " start= auto");
 
 		printf("command ：%s\n", path);
 		system(path);
-		memcpy(path2, "sc start ", strlen("sc start "));
-		memcpy(path2 + strlen("sc start "), pNextInfo.cFileName, strlen(pNextInfo.cFileName));
+		strcat(path2, "sc start ");
+		strcat(path2 , pNextInfo.cFileName);
 
 		printf("command ：%s\n", path2);
 
