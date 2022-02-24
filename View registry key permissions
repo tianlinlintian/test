@@ -1,0 +1,92 @@
+//遍历注册表子项 查看是否拥有传入参数的权限 相比accesschk 只能显示R W来说更细节
+#include <stdio.h>
+#include <windows.h>
+#include <string.h>
+#include <Aclapi.h>
+
+#pragma comment(lib, "ntdll")
+#pragma comment (lib,"Advapi32.lib")
+
+#pragma warning(disable:4996)
+
+extern "C" int NTAPI NtDeleteKey(HKEY);
+
+
+DWORD GetRegKeyCount(HKEY hKey, DWORD dwIndex, TCHAR* achKey, DWORD dwKeyLen)
+{
+    LONG   lRet = ERROR_SUCCESS;
+    DWORD  cSubKeys = 0;
+    DWORD  cMaxKeyLens = 0;
+
+    lRet = RegQueryInfoKeyW(hKey, NULL, NULL, NULL, &cSubKeys, &cMaxKeyLens, NULL, NULL, NULL, NULL, NULL, NULL);
+    if (lRet != ERROR_SUCCESS)
+    {
+        return 0;
+    }
+
+    if (cSubKeys != 0 && achKey != NULL)
+    {
+        lRet = RegEnumKeyExW(
+            hKey,
+            dwIndex,
+            achKey,
+            &dwKeyLen,
+            NULL,
+            NULL,
+            NULL,
+            NULL
+        );
+        if (lRet != ERROR_SUCCESS)
+        {
+            return 0;
+        }
+    }
+    return cSubKeys;
+}
+
+
+void SearchKey(HKEY hKey, LPCTSTR lpSubKey, LPCTSTR lpSubKey2, DWORD ACCESS)
+{
+    HKEY hSubKey = NULL;
+    HKEY hSubKey2 = NULL;
+    WCHAR subKeyName[MAX_PATH + 1] = { 0 };
+    WCHAR subKeyName2[MAX_PATH + 1] = { 0 };
+
+
+    if (ERROR_SUCCESS == RegOpenKeyExW(hKey, lpSubKey, 0, MAXIMUM_ALLOWED, &hSubKey))
+    {
+        //获取lpSubKey下面有多少个子项
+        DWORD dwSubKey = GetRegKeyCount(hSubKey, 0, NULL, 0);
+        for (int i = 0; i < dwSubKey; i++)
+        {
+            if (ERROR_SUCCESS == RegEnumKeyW(hSubKey, i, subKeyName, MAX_PATH))
+            {
+                if (ERROR_SUCCESS==RegOpenKeyExW(hSubKey, subKeyName,
+                    NULL, ACCESS, &hSubKey2))
+                {
+                    wcscat(subKeyName2, lpSubKey2);
+                    wcscat(subKeyName2, L"\\");
+                    wcscat(subKeyName2, subKeyName);
+                    printf("HKEY_LOCAL_MACHINE\\%S\n", subKeyName2);
+                    SearchKey(hSubKey, subKeyName, subKeyName2,ACCESS);
+                }
+            }
+            memset(subKeyName2, 0, MAX_PATH + 1);
+        }
+        //关闭
+        if (hSubKey)
+        {
+            RegCloseKey(hSubKey);
+        }
+    }
+}
+
+int main() {
+    DWORD ACCESS = KEY_CREATE_LINK;
+
+    const WCHAR* path = L"SYSTEM\\ControlSet001\\services";
+
+    SearchKey(HKEY_LOCAL_MACHINE, path, path, KEY_CREATE_LINK);
+
+    return 0;
+}
