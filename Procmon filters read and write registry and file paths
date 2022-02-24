@@ -1,4 +1,4 @@
-//使用本程序需要先使用Process Monitor保存的事件到文件，使用CSV格式，默认文件名为Logfile.CSV
+//使用本程序需要先使用Procmon保存的事件到文件，使用CSV格式，默认文件名为Logfile.CSV
 //此程序会将.CSV中的所有路径遍历 并判断注册表路径和文件路径是否对当前进程可以访问，能访问则打印
 
 #include <sddl.h>
