@@ -1,7 +1,6 @@
 //我解析了pmc文件格式 本程序会将HKLM\\SYSTEM\\ControlSet001\\services能创建注册表符号链接的项打印并生成pmc文件直接可以由Procmon导入
 //省去了不用手动一个个点击配置的麻烦
 
-//遍历注册表子项 查看是否拥有传入参数的权限 相比accesschk 只能显示R W来说更细节
 #include <stdio.h>
 #include <windows.h>
 #include <string.h>
