@@ -1,4 +1,4 @@
-//遍历注册表子项 查看是否拥有传入参数的权限 相比accesschk 只能显示R W来说更细节
+//遍历注册表子项 查看是否拥有传入参数的权限 对比accesschk只能显示R W来说更细节
 #include <stdio.h>
 #include <windows.h>
 #include <string.h>
