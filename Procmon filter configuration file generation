@@ -129,34 +129,34 @@ unsigned char data9[8] = {
 };
 DWORD GetRegKeyCount(HKEY hKey, DWORD dwIndex, TCHAR* achKey, DWORD dwKeyLen)
 {
-    LONG   lRet = ERROR_SUCCESS;
-    DWORD  cSubKeys = 0;
-    DWORD  cMaxKeyLens = 0;
+	LONG   lRet = ERROR_SUCCESS;
+	DWORD  cSubKeys = 0;
+	DWORD  cMaxKeyLens = 0;
 
-    lRet = RegQueryInfoKeyW(hKey, NULL, NULL, NULL, &cSubKeys, &cMaxKeyLens, NULL, NULL, NULL, NULL, NULL, NULL);
-    if (lRet != ERROR_SUCCESS)
-    {
-        return 0;
-    }
+	lRet = RegQueryInfoKeyW(hKey, NULL, NULL, NULL, &cSubKeys, &cMaxKeyLens, NULL, NULL, NULL, NULL, NULL, NULL);
+	if (lRet != ERROR_SUCCESS)
+	{
+		return 0;
+	}
 
-    if (cSubKeys != 0 && achKey != NULL)
-    {
-        lRet = RegEnumKeyExW(
-            hKey,
-            dwIndex,
-            achKey,
-            &dwKeyLen,
-            NULL,
-            NULL,
-            NULL,
-            NULL
-        );
-        if (lRet != ERROR_SUCCESS)
-        {
-            return 0;
-        }
-    }
-    return cSubKeys;
+	if (cSubKeys != 0 && achKey != NULL)
+	{
+		lRet = RegEnumKeyExW(
+			hKey,
+			dwIndex,
+			achKey,
+			&dwKeyLen,
+			NULL,
+			NULL,
+			NULL,
+			NULL
+		);
+		if (lRet != ERROR_SUCCESS)
+		{
+			return 0;
+		}
+	}
+	return cSubKeys;
 }
 
 char* data2;
@@ -167,65 +167,65 @@ ULONG num;
 
 void SearchKey(HKEY hKey, LPCTSTR lpSubKey, LPCTSTR lpSubKey2, DWORD ACCESS)
 {
-    HKEY hSubKey = NULL;
-    HKEY hSubKey2 = NULL;
-    WCHAR subKeyName[MAX_PATH + 1] = { 0 };
-    WCHAR subKeyName2[MAX_PATH + 1] = { 0 };
+	HKEY hSubKey = NULL;
+	HKEY hSubKey2 = NULL;
+	WCHAR subKeyName[MAX_PATH + 1] = { 0 };
+	WCHAR subKeyName2[MAX_PATH + 1] = { 0 };
 
 
-    if (ERROR_SUCCESS == RegOpenKeyExW(hKey, lpSubKey, 0, MAXIMUM_ALLOWED, &hSubKey))
-    {
-        //获取lpSubKey下面有多少个子项
-        DWORD dwSubKey = GetRegKeyCount(hSubKey, 0, NULL, 0);
+	if (ERROR_SUCCESS == RegOpenKeyExW(hKey, lpSubKey, 0, MAXIMUM_ALLOWED, &hSubKey))
+	{
+		//获取lpSubKey下面有多少个子项
+		DWORD dwSubKey = GetRegKeyCount(hSubKey, 0, NULL, 0);
 
-        for (int i = 0; i < dwSubKey; i++)
-        {
-            if (ERROR_SUCCESS == RegEnumKeyW(hSubKey, i, subKeyName, MAX_PATH))
-            {
-                wcscat(subKeyName2, lpSubKey2);
-                wcscat(subKeyName2, L"\\");
-                wcscat(subKeyName2, subKeyName);
-                if (ERROR_SUCCESS==RegOpenKeyExW(hSubKey, subKeyName,
-                    NULL, ACCESS, &hSubKey2))
-                {
+		for (int i = 0; i < dwSubKey; i++)
+		{
+			if (ERROR_SUCCESS == RegEnumKeyW(hSubKey, i, subKeyName, MAX_PATH))
+			{
+				wcscat(subKeyName2, lpSubKey2);
+				wcscat(subKeyName2, L"\\");
+				wcscat(subKeyName2, subKeyName);
+				if (ERROR_SUCCESS == RegOpenKeyExW(hSubKey, subKeyName,
+					NULL, ACCESS, &hSubKey2))
+				{
 					ULONG datasize = sizeof(data3) + 4 + (wcslen(L"HKLM\\") * 2) + (wcslen(subKeyName2) * 2) + 0xA;
 					datasize2 += datasize;
-					ULONG datasize2 = (wcslen(L"HKLM\\") * 2) + (wcslen(subKeyName2) * 2) +2;
-					memcpy(data7 , data3,sizeof(data3));
+					ULONG datasize2 = (wcslen(L"HKLM\\") * 2) + (wcslen(subKeyName2) * 2) + 2;
+					memcpy(data7, data3, sizeof(data3));
 					memcpy(data7 + sizeof(data3), &datasize2, 4);
 					memcpy(data7 + sizeof(data3) + 4, L"HKLM\\", wcslen(L"HKLM\\") * 2);
-					memcpy(data7 + sizeof(data3) + 4 + wcslen(L"HKLM\\") * 2, subKeyName2, wcslen(subKeyName2)*2);
+					memcpy(data7 + sizeof(data3) + 4 + wcslen(L"HKLM\\") * 2, subKeyName2, wcslen(subKeyName2) * 2);
 
 					memset(data7 + sizeof(data3) + 4 + (wcslen(L"HKLM\\") * 2) + (wcslen(subKeyName2) * 2), 0, 0xA);
 
 					data7 += datasize;
 					num++;
-                    printf("HKLM\\%S\n", subKeyName2);
-                }
-                SearchKey(hSubKey, subKeyName, subKeyName2, ACCESS);
-            }
-            memset(subKeyName2, 0, MAX_PATH + 1);
-        }
-        //关闭
-        if (hSubKey)
-        {
-            RegCloseKey(hSubKey);
-        }
-    }
+					printf("HKLM%S\n", subKeyName2);
+				}
+				SearchKey(hSubKey, subKeyName, subKeyName2, ACCESS);
+			}
+			memset(subKeyName2, 0, MAX_PATH + 1);
+		}
+		//关闭
+		if (hSubKey)
+		{
+			RegCloseKey(hSubKey);
+		}
+	}
 }
 
 int main() {
 
-	
+
 	data2 = (char*)malloc(0x1000000);
 	data7 = (char*)malloc(0x1000000);
 	ULONG data8 = (ULONG)data7;
 
 	ULONG size1, size2 = 0;
 
-    WCHAR path[0x1000] = L"SYSTEM\\ControlSet001\\services";
+	WCHAR path[0x1000] = L"";
 
-    SearchKey(HKEY_LOCAL_MACHINE, path, path, KEY_CREATE_LINK);
+	SearchKey(HKEY_LOCAL_MACHINE, path, path, KEY_CREATE_LINK | KEY_CREATE_SUB_KEY);
 
 	datasize3 = datasize2 - 0x28;
 
@@ -235,16 +235,16 @@ int main() {
 	datasize2 += 0x2d;
 	memcpy(data2 + 0x5C6, &datasize2, 4);
 	datasize2 -= 0x2d;
-	printf("%x", datasize2);
 
-	memcpy(data2 + 0x5C6 +4, data9, sizeof(data9));
+
+	memcpy(data2 + 0x5C6 + 4, data9, sizeof(data9));
 
 	datasize3 += 0x2d;
 
 	memcpy(data2 + 0x5C6 + 4 + sizeof(data9), &datasize3, 4);
 
 
-	memcpy(data2 + 0x5C6 + 4 + sizeof(data9) + 4 , data6, sizeof(data6));
+	memcpy(data2 + 0x5C6 + 4 + sizeof(data9) + 4, data6, sizeof(data6));
 
 	memcpy(data2 + 0x5C6 + 4 + sizeof(data6) + sizeof(data9) + 4, &num, 4);
 
@@ -255,12 +255,12 @@ int main() {
 
 	HANDLE hFILE = CreateFileA("1.pmc", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
-	DWORD dwWrite=0;
+	DWORD dwWrite = 0;
 
 	WriteFile(hFILE, (PVOID)data2, 0x5C6 + 4 + sizeof(data6) + 4 + datasize2 + sizeof(data9) + 4 + sizeof(data5), &dwWrite, NULL);
-	
+
 	CloseHandle(hFILE);
 
 
-    return 0;
+	return 0;
 }
