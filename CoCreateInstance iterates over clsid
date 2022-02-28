@@ -1,0 +1,165 @@
+//遍历clsid调用CoCreateInstance
+
+
+//以下为Windows PowerShell 命令获取本地服务类clisd
+//cd OleViewDotNet所在目录
+//set-executionpolicy remotesigned
+//Import-Module .\OleViewDotNet.psd1
+//Get-ComDatabase -SetCurrent
+//Set-ComDatabase .\com.db
+//Get-ComDatabase .\com.db -SetCurrent
+//$comdb = Get-CurrentComDatabase
+//$runas = Get-ComClass -ServerType LocalServer32 | ? RunAs -eq "Interactive User"
+//$runas  | Select-ComAccess -ProcessId 5084 | Select CLSID >>1.txt
+
+
+#include <stdio.h>
+#include <windows.h>
+#include <hstring.h>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <string>
+#include <string.h>
+#include <windows.h>
+#include <strsafe.h>
+#include <tlhelp32.h>
+
+#pragma warning(disable:4996)
+
+using namespace std;
+
+
+class __declspec(uuid("097ad6b8-203b-4506-a509-02e4b11b6bb5")) ICOMServerRegistrar : public IUnknown {
+public:
+    virtual HRESULT __stdcall Proc3(/* Stack Offset: 8 */ GUID* p0, /* Stack Offset: 16 */ IUnknown* p1, /* Stack Offset: 24 */ int64_t* p2);
+    virtual HRESULT __stdcall Proc4(/* Stack Offset: 8 */ int64_t p0);
+    virtual HRESULT __stdcall Proc5(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */ int64_t p1, /* Stack Offset: 24 */ int64_t p2, /* Stack Offset: 32 */ int64_t* p3, /* Stack Offset: 40 */ int64_t p4, /* Stack Offset: 48 */ int64_t p5, /* Stack Offset: 56 */ int64_t p6);
+    virtual HRESULT __stdcall Proc6(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */ int64_t p1, /* Stack Offset: 24 */ int64_t p2, /* Stack Offset: 32 */ int64_t p3, /* Stack Offset: 40 */ int64_t* p4);
+    virtual HRESULT __stdcall Proc7(/* Stack Offset: 8 */ HWND p0, /* Stack Offset: 16 */ GUID* p1, /* Stack Offset: 24 */ IUnknown** p2);
+};
+
+
+//ICOMServerRegistrar* p;
+IUnknown* p;
+
+UUID clsid;
+
+FILE* fp;
+
+char str[0x1000];
+WCHAR buf[0x1000];
+WCHAR buf2[0x1000];
+size_t i = 0;
+size_t f = 0;
+size_t flag = 0;
+int num = 0;;
+
+void th(){
+    
+    while (true)
+    {
+        size_t n = 0;
+        for (; n < 10; n++)
+        {
+            Sleep(1000);
+            if (f)
+            {
+                break;
+            }
+        }
+        if (n==10)
+        {
+            printf("%S 初始化接口时等待时间过长\n", buf2);
+            for (; i < num; i++)
+            {
+                fgets(str, 0x1000, fp);
+
+                for (size_t j = 0; j < 0x48; j++)
+                {
+                    if (str[j])
+                    {
+                        buf[j / 2] = str[j];
+                    }
+                }
+                buf2[0] = L'{';
+
+                memcpy(&buf2[1], buf, 0x48);
+                buf2[0x25] = L'}';
+                buf2[0x26] = L'\0';
+
+                CLSIDFromString(buf2, &clsid);
+
+                HANDLE hTargetHandle = 0;
+                CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
+                f = 0;
+                HRESULT hr = CoCreateInstance(clsid, NULL, CLSCTX_LOCAL_SERVER, __uuidof(p), (LPVOID*)&p);
+
+                f = 1;
+                if (!hr)
+                {
+                    printf("%S\n", buf2);
+                }
+            }
+            printf("运行完毕\n");
+            exit(-1);
+        }
+    }
+}
+int main(int argc, char* argv[]) {
+
+
+    if ((fp = fopen("1.txt", "r")) == NULL) {
+        puts("Fail to open file!");
+        exit(0);
+    }
+    
+    while (!feof(fp))
+    {
+        flag = fgetc(fp);
+        if (flag == '\n')
+            num++;
+    }
+    num -= 2;
+    fseek(fp, 0, SEEK_SET);
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+   
+
+    printf("支持多线程套件的clsid \n");
+
+
+    CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
+    for (; i < num; i++)
+    {
+        fgets(str, 0x1000, fp);
+       
+        for (size_t j = 0; j < 0x48; j++)
+        {
+            if (str[j])
+            {
+                buf[j / 2] = str[j];
+            }
+        }
+        buf2[0] = L'{';
+
+        memcpy(&buf2[1], buf, 0x48);
+        buf2[0x25] = L'}';
+        buf2[0x26] = L'\0';
+      
+        CLSIDFromString(buf2, &clsid);
+
+        HANDLE hTargetHandle = 0;
+        f = 0;
+        HRESULT hr = CoCreateInstance(clsid, NULL, CLSCTX_LOCAL_SERVER, __uuidof(p), (LPVOID*)&p);
+
+        f = 1;
+        if (!hr)
+        {
+            printf("%S\n", buf2);
+        }
+    }
+
+    printf("运行完毕\n");
+    getchar();
+    return 0;
+}
