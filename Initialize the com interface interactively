@@ -24,64 +24,158 @@
 #include <windows.h>
 #include <strsafe.h>
 #include <tlhelp32.h>
-#define MAX_LENGTH 50
-#define NORMAL_LENGTH 20
 #pragma warning(disable:4996)
 
 using namespace std;
 
-class __declspec(uuid("e3a475cf-34ea-4e9a-9f3e-48ce5c6e4e57")) ITaskCompletionCallback : public IUnknown {
-public:
-    virtual HRESULT __stdcall Proc3(/* Stack Offset: 8 */ INT64 p0, /* Stack Offset: 16 */ /* ENUM32 */ INT32 p1);
-};
+UUID clsid;
+
+FILE* fp;
+
+char str[0x1000];
+
+size_t i = 0;
+size_t f = 0;
+size_t flag = 0;
+int num = 0;;
+IUnknown* p;
 
 
-class __declspec(uuid("27eb33a5-77f9-4afe-ae05-6fdbbe720ee7")) ICOMServerRegistrar : public IUnknown {
-public:
-    virtual HRESULT __stdcall Proc3(/* Stack Offset: 8 */ GUID* p0, /* Stack Offset: 16 */ IUnknown* p1, /* Stack Offset: 24 */ int64_t* p2);
-    virtual HRESULT __stdcall Proc4(/* Stack Offset: 8 */ int64_t p0);
-    virtual HRESULT __stdcall Proc5(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */ int64_t p1, /* Stack Offset: 24 */ int64_t p2, /* Stack Offset: 32 */ int64_t* p3, /* Stack Offset: 40 */ int64_t p4, /* Stack Offset: 48 */ int64_t p5, /* Stack Offset: 56 */ int64_t p6);
-    virtual HRESULT __stdcall Proc6(/* Stack Offset: 8 */ int64_t p0, /* Stack Offset: 16 */ int64_t p1, /* Stack Offset: 24 */ int64_t p2, /* Stack Offset: 32 */ int64_t p3, /* Stack Offset: 40 */ int64_t* p4);
-    virtual HRESULT __stdcall Proc7(/* Stack Offset: 8 */ HWND p0, /* Stack Offset: 16 */ GUID* p1, /* Stack Offset: 24 */ IUnknown** p2);
-};
+void th() {
 
+    WCHAR buf[0x1000];
+    WCHAR buf2[0x1000];
+    WCHAR buf3[0x1000];
 
-ICOMServerRegistrar* pICOMServerRegistrar;
+    IBindCtx* pbc;
+    ULONG cEaten;
+    LPMONIKER pmk;
+    while (true)
+    {
+        size_t n = 0;
+        for (; n < 10; n++)
+        {
+            Sleep(1000);
+            if (f)
+            {
+                break;
+            }
+        }
+        if (n == 10)
+        {
+            printf("上面的接口初始化接口时等待时间过长\n");
+            for (; i < num; i++)
+            {
+                fgets(str, 0x1000, fp);
 
+                for (size_t j = 0; j < 0x48; j++)
+                {
+                    if (str[j])
+                    {
+                        buf[j / 2] = str[j];
+                    }
+                }
+                HRESULT hr = CreateBindCtx(NULL, &pbc);
+
+                if (S_OK == hr) {
+                    //2替换成另一个登陆的用户会话代表数字
+                    wcscat(buf3, L"session:3!new:");
+                    memcpy(&buf2, buf, 0x48);
+
+                    buf2[0x24] = L'\0';
+                    memcpy(buf3 + 14, buf2, 0x48);
+
+                    hr = MkParseDisplayName(pbc, buf3, &cEaten, &pmk);
+                    if (S_OK == hr) {
+                        f = 0;
+                        hr = pmk->BindToObject(pbc, 0, __uuidof(p), (LPVOID*)&p);
+                        if (S_OK == hr) {
+                            printf("%S\n", buf3);
+                        }
+                        f = 1;
+                    }
+                    memset(buf3, 0, 0x1000);
+                    memset(buf2, 0, 0x1000);
+                    memset(buf, 0, 0x1000);
+                }
+            }
+            printf("运行完毕\n");
+            memset(buf3, 0, 0x1000);
+            memset(buf2, 0, 0x1000);
+            memset(buf, 0, 0x1000);
+        }
+    }
+}
 
 int main(int argc, char* argv[]) {
-
-
+    WCHAR buf[0x1000];
+    WCHAR buf2[0x1000];
     IBindCtx* pbc;
     ULONG cEaten;
     LPMONIKER pmk;
 
 
+    if ((fp = fopen("1.txt", "r")) == NULL) {
+        puts("Fail to open file!");
+        exit(0);
+    }
+
+    while (!feof(fp))
+    {
+        flag = fgetc(fp);
+        if (flag == '\n')
+            num++;
+    }
+    num -= 2;
+    fseek(fp, 0, SEEK_SET);
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
-    HRESULT hr = CreateBindCtx(NULL, &pbc);
 
-    if (FAILED(hr)) {
-     printf("CreateBindCtx Error \n");
-     }
-  
-    //2替换成另一个登陆的用户会话代表数字
-    hr = MkParseDisplayName(pbc, L"session:2!new:54E14197-88B0-442F-B9A3-86837061E2FB", &cEaten, &pmk);
-    if (FAILED(hr)) {
-        printf("MkParseDisplayName Error %x\n",hr);
-        return 0;
-    }
-    
-    
-    pmk->BindToObject(pbc, 0, __uuidof(pICOMServerRegistrar), (LPVOID*)&pICOMServerRegistrar);
-    if (FAILED(hr)) {
-        printf("BindMoniker Error \n");
-        return 0;
-    
-    }
-    
-    printf("pICOMServerRegistrar %x\n", pICOMServerRegistrar);
+    printf("支持多线程套件的clsid \n");
+
+    WCHAR buf3[0X1000];
+
  
-         
+    CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
+    for (; i < num; i++)
+    {
+        fgets(str, 0x1000, fp);
+
+        for (size_t j = 0; j < 0x48; j++)
+        {
+            if (str[j])
+            {
+                buf[j / 2] = str[j];
+            }
+        }
+        
+        HRESULT hr = CreateBindCtx(NULL, &pbc);
+        if (S_OK == hr) {
+            //2替换成另一个登陆的用户会话代表数字
+            wcscat(buf3, L"session:3!new:");
+            memcpy(&buf2, buf, 0x48);
+
+            buf2[0x24] = L'\0';
+            memcpy(buf3 + 14, buf2, 0x48);
+
+            hr = MkParseDisplayName(pbc, buf3, &cEaten, &pmk);
+            if (S_OK == hr) {
+                f = 0;
+                hr = pmk->BindToObject(pbc, 0, __uuidof(p), (LPVOID*)&p);
+                if (S_OK == hr) {
+                    printf("%S\n", buf3);
+                }
+                f = 1;
+            }
+            memset(buf3, 0, 0x1000);
+            memset(buf2, 0, 0x1000);
+            memset(buf, 0, 0x1000);
+        }
+    }
+
+    printf("运行完毕\n");
+
+    getchar();
     return 0;
 }
+
