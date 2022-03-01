@@ -195,50 +195,72 @@ int main(int argc, char* argv[])
 				if (str[indx]=='H')
 				{
 					HKEY hKey;
+					HKEY hKey2;
 					ULONG	disp;
 					ULONG retdelete;
+					ULONG SET_VALUE;
 					ULONG retcreate;
 					//对HKU以及HKCU不感兴趣 因为注册表符号链接仅对当前根项有效 如果有别的需要可以删除这个过滤代码
-					if (str[indx + 2] == 'U'||
-						(str[indx + 2] == 'C' &&str[indx + 3] == 'U'))
+					if (str[indx + 2] == 'U' ||
+						(str[indx + 2] == 'C' && str[indx + 3] == 'U'))
 					{
 						break;
 					}
 					else if (str[indx + 2] == 'L' && str[indx + 3] == 'M')
 					{
-						retdelete = RegDeleteKeyA(HKEY_LOCAL_MACHINE, &str[indx + 5]);
+						retcreate = RegOpenKeyExA(HKEY_LOCAL_MACHINE, &str[indx + 5], 0, KEY_CREATE_SUB_KEY |KEY_CREATE_LINK, &hKey2);
 
-						retcreate = RegCreateKeyExA(HKEY_LOCAL_MACHINE, &str[indx + 5],
-							0, 0, 0, KEY_ALL_ACCESS, 0, &hKey, &disp);
+						SET_VALUE = RegOpenKeyExA(HKEY_LOCAL_MACHINE, &str[indx + 5], 0, KEY_SET_VALUE, &hKey2);
+
+						retdelete = RegOpenKeyExA(HKEY_LOCAL_MACHINE, &str[indx + 5], 0, DELETE, &hKey2);
 
 					}
 					else if (str[indx + 2] == 'C' && str[indx + 3] == 'R')
 					{
-						retdelete = RegDeleteKeyA(HKEY_CLASSES_ROOT, &str[indx + 5]);
+						retcreate = RegOpenKeyExA(HKEY_CLASSES_ROOT, &str[indx + 5], 0, KEY_CREATE_SUB_KEY | KEY_CREATE_LINK, &hKey2);
 
-						retcreate = RegCreateKeyExA(HKEY_CLASSES_ROOT, &str[indx + 5],
-							0, 0, 0, KEY_ALL_ACCESS, 0, &hKey, &disp);
+						SET_VALUE = RegOpenKeyExA(HKEY_CLASSES_ROOT, &str[indx + 5], 0, KEY_SET_VALUE, &hKey2);
+
+						retdelete = RegOpenKeyExA(HKEY_CLASSES_ROOT, &str[indx + 5], 0, DELETE, &hKey2);
 					}
 
 					else if (str[indx + 2] == 'C' && str[indx + 3] == 'C')
 					{
-						retdelete = RegDeleteKeyA(HKEY_CURRENT_CONFIG, &str[indx + 5]);
+						retcreate = RegOpenKeyExA(HKEY_CURRENT_CONFIG, &str[indx + 5], 0, KEY_CREATE_SUB_KEY | KEY_CREATE_LINK, &hKey2);
 
-						retcreate = RegCreateKeyExA(HKEY_CURRENT_CONFIG, &str[indx + 5],
-							0, 0, 0, KEY_ALL_ACCESS, 0, &hKey, &disp);
+						SET_VALUE = RegOpenKeyExA(HKEY_CURRENT_CONFIG, &str[indx + 5], 0, KEY_SET_VALUE, &hKey2);
+
+						retdelete = RegOpenKeyExA(HKEY_CURRENT_CONFIG, &str[indx + 5], 0, DELETE, &hKey2);
+
 					}
-					//如果能创建或者能删除就打印
-					if (retdelete ==ERROR_SUCCESS&& retcreate == ERROR_SUCCESS)
+					//打印
+					if (retdelete == ERROR_SUCCESS && retcreate == ERROR_SUCCESS&& SET_VALUE==ERROR_SUCCESS)
 					{
-						printf("%s 可以被删除和创建\n", &str[indx]);
+						printf("%s 可以被删除和创建符号链接以及设置键值\n", &str[indx]);
 					}
-					else if(retdelete == ERROR_SUCCESS)
+					else if (retdelete == ERROR_SUCCESS && retcreate == ERROR_SUCCESS)
+					{
+						printf("%s 可以被删除和创建符号链接\n", &str[indx]);
+					}
+					else if (retcreate == ERROR_SUCCESS && SET_VALUE == ERROR_SUCCESS)
+					{
+						printf("%s 可以设置键值和创建符号链接\n", &str[indx]);
+					}
+					else if(retdelete == ERROR_SUCCESS&& SET_VALUE == ERROR_SUCCESS)
+					{
+						printf("%s 可以被删除和设置键值\n", &str[indx]);
+					}
+					else if(SET_VALUE == ERROR_SUCCESS)
+					{
+						printf("%s 可以被设置键值\n", &str[indx]);
+					}
+					else if (retdelete == ERROR_SUCCESS)
 					{
 						printf("%s 可以被删除 \n", &str[indx]);
 					}
 					else if (retcreate == ERROR_SUCCESS)
 					{
-						printf("%s 可以被创建 \n", &str[indx]);
+						printf("%s 可以被创建符号链接 \n", &str[indx]);
 					}
 				}
 				//如果是文件路径
