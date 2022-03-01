@@ -1,6 +1,3 @@
-//遍历clsid调用CoCreateInstance
-
-
 //以下为Windows PowerShell 命令获取本地服务类clisd
 //cd OleViewDotNet所在目录
 //set-executionpolicy remotesigned
@@ -12,6 +9,7 @@
 //$runas = Get-ComClass -ServerType LocalServer32 | ? RunAs -eq "Interactive User"
 //$runas  | Select-ComAccess -ProcessId 5084 | Select CLSID >>1.txt
 
+//该代码打开1.txt文件遍历clsid调用CoCreateInstance 打印能获得实例的clsid
 
 #include <stdio.h>
 #include <windows.h>
@@ -47,16 +45,16 @@ UUID clsid;
 
 FILE* fp;
 
-char str[0x1000];
-WCHAR buf[0x1000];
-WCHAR buf2[0x1000];
+
 size_t i = 0;
 size_t f = 0;
 size_t flag = 0;
 int num = 0;;
 
-void th(){
-    
+void th() {
+    char str[0x1000];
+    WCHAR buf[0x1000];
+    WCHAR buf2[0x1000];
     while (true)
     {
         size_t n = 0;
@@ -68,7 +66,7 @@ void th(){
                 break;
             }
         }
-        if (n==10)
+        if (n == 10)
         {
             printf("%S 初始化接口时等待时间过长\n", buf2);
             for (; i < num; i++)
@@ -100,20 +98,23 @@ void th(){
                 {
                     printf("%S\n", buf2);
                 }
+                memset(buf2, 0, 0x1000);
+                memset(buf, 0, 0x1000);
             }
             printf("运行完毕\n");
-            exit(-1);
         }
     }
 }
 int main(int argc, char* argv[]) {
 
-
+    char str[0x1000];
+    WCHAR buf[0x1000];
+    WCHAR buf2[0x1000];
     if ((fp = fopen("1.txt", "r")) == NULL) {
         puts("Fail to open file!");
         exit(0);
     }
-    
+
     while (!feof(fp))
     {
         flag = fgetc(fp);
@@ -123,7 +124,7 @@ int main(int argc, char* argv[]) {
     num -= 2;
     fseek(fp, 0, SEEK_SET);
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
-   
+
 
     printf("支持多线程套件的clsid \n");
 
@@ -132,7 +133,7 @@ int main(int argc, char* argv[]) {
     for (; i < num; i++)
     {
         fgets(str, 0x1000, fp);
-       
+
         for (size_t j = 0; j < 0x48; j++)
         {
             if (str[j])
@@ -145,7 +146,7 @@ int main(int argc, char* argv[]) {
         memcpy(&buf2[1], buf, 0x48);
         buf2[0x25] = L'}';
         buf2[0x26] = L'\0';
-      
+
         CLSIDFromString(buf2, &clsid);
 
         HANDLE hTargetHandle = 0;
@@ -156,7 +157,10 @@ int main(int argc, char* argv[]) {
         if (!hr)
         {
             printf("%S\n", buf2);
+            memset(buf2, 0, 0x1000);
+            memset(buf, 0, 0x1000);
         }
+
     }
 
     printf("运行完毕\n");
