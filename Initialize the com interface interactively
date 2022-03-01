@@ -1,12 +1,10 @@
-
-
 //获取能访问的交互式clsid
 
 //遍历 Windows PowerShell命令 
 //cd OleViewDotNet.exe目录
 //set-executionpolicy remotesigned
 //Import-Module .\OleViewDotNet.psd1
-//Get-ComClass -InteractiveUser | Select-ComAccess -Principal S-1-0-0
+//Get-ComClass -InteractiveUser | Select-ComAccess -Principal S-1-0-0 | Select CLsid
 
 
 //此代码是获得交互式com接口的示例,并且在遍历刚才获得得到的结果基础上再次实例化接口 并打印能实例化成功的clsid
