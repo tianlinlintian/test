@@ -79,7 +79,7 @@ void th() {
 
                 if (S_OK == hr) {
                     //2替换成另一个登陆的用户会话代表数字
-                    wcscat(buf3, L"session:3!new:");
+                    wcscat(buf3, L"session:2!new:");
                     memcpy(&buf2, buf, 0x48);
 
                     buf2[0x24] = L'\0';
@@ -152,7 +152,7 @@ int main(int argc, char* argv[]) {
         HRESULT hr = CreateBindCtx(NULL, &pbc);
         if (S_OK == hr) {
             //2替换成另一个登陆的用户会话代表数字
-            wcscat(buf3, L"session:3!new:");
+            wcscat(buf3, L"session:2!new:");
             memcpy(&buf2, buf, 0x48);
 
             buf2[0x24] = L'\0';
