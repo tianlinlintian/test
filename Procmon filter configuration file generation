@@ -1,4 +1,4 @@
-//我解析了pmc文件格式 本程序会将HKLM\\SYSTEM\\ControlSet001\\services能创建注册表符号链接的项打印并生成pmc文件直接可以由Procmon导入
+//我解析了pmc文件格式 本程序会将HKLM能创建注册表符号链接的项打印并生成pmc文件直接可以由Procmon导入
 //省去了不用手动一个个点击配置的麻烦
 
 #include <stdio.h>
