@@ -71,7 +71,6 @@ BOOL IsDirectoryWrite(CHAR* filePath)
 }
 
 
-//传入要遍历的文件夹路径 查看是否能够DELETE该文件夹下的所有文件
 BOOL TraverseDirectory(wchar_t Dir[MAX_PATH])
 {
 	WIN32_FIND_DATA FindFileData;
