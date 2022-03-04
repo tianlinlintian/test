@@ -6,10 +6,9 @@
 //Set-ComDatabase .\com.db
 //Get-ComDatabase .\com.db -SetCurrent
 //$comdb = Get-CurrentComDatabase
-//$runas = Get-ComClass -ServerType LocalServer32 | ? RunAs -eq "Interactive User"
-//$runas  | Select-ComAccess -ProcessId 5084 | Select CLSID >>1.txt
+//$runas = Get-ComClass -ServerType LocalServer32 >>1.txt
 
-//该代码打开1.txt文件遍历clsid调用CoCreateInstance 打印能获得实例的clsid
+//该代码打开1.txt文件遍历clsid调用CoCreateInstance 打印能获得实例的clsid （以当前进程权限）
 
 #include <stdio.h>
 #include <windows.h>
@@ -45,7 +44,7 @@ UUID clsid;
 
 FILE* fp;
 
-
+int z = 0;
 size_t i = 0;
 size_t f = 0;
 size_t flag = 0;
@@ -89,7 +88,12 @@ void th() {
                 CLSIDFromString(buf2, &clsid);
 
                 HANDLE hTargetHandle = 0;
-                CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
+                if (z<4)
+                {
+                    CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
+                }
+             
+                z++;
                 f = 0;
                 HRESULT hr = CoCreateInstance(clsid, NULL, CLSCTX_LOCAL_SERVER, __uuidof(p), (LPVOID*)&p);
 
@@ -130,6 +134,7 @@ int main(int argc, char* argv[]) {
 
 
     CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
+
     for (; i < num; i++)
     {
         fgets(str, 0x1000, fp);
