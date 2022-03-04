@@ -185,13 +185,13 @@ int main(int argc, char* argv[])
 			}
 			if (num == 5)
 			{
-				str[j-1] = 0;
+				str[j - 1] = 0;
 
 				//打印路径
 				//printf("%s\n", &str[indx]);
 
 				//如果是注册表路径
-				if (str[indx]=='H')
+				if (str[indx] == 'H')
 				{
 					HKEY hKey;
 					HKEY hKey2;
@@ -199,6 +199,7 @@ int main(int argc, char* argv[])
 					ULONG retdelete;
 					ULONG SET_VALUE;
 					ULONG retcreate;
+					ULONG retcreatelink;
 					//对HKU以及HKCU不感兴趣 因为注册表符号链接仅对当前根项有效 如果有别的需要可以删除这个过滤代码
 					if (str[indx + 2] == 'U' ||
 						(str[indx + 2] == 'C' && str[indx + 3] == 'U'))
@@ -207,60 +208,66 @@ int main(int argc, char* argv[])
 					}
 					else if (str[indx + 2] == 'L' && str[indx + 3] == 'M')
 					{
-						retcreate = RegOpenKeyExA(HKEY_LOCAL_MACHINE, &str[indx + 5], 0, KEY_CREATE_SUB_KEY |KEY_CREATE_LINK, &hKey2);
+						retcreatelink = RegOpenKeyExA(HKEY_LOCAL_MACHINE, &str[indx + 5], 0, KEY_CREATE_SUB_KEY | KEY_CREATE_LINK, &hKey2);
 
 						SET_VALUE = RegOpenKeyExA(HKEY_LOCAL_MACHINE, &str[indx + 5], 0, KEY_SET_VALUE, &hKey2);
 
 						retdelete = RegOpenKeyExA(HKEY_LOCAL_MACHINE, &str[indx + 5], 0, DELETE, &hKey2);
 
+						retcreate = RegOpenKeyExA(HKEY_LOCAL_MACHINE, &str[indx + 5], 0, KEY_CREATE_SUB_KEY, &hKey2);
+
 					}
 					else if (str[indx + 2] == 'C' && str[indx + 3] == 'R')
 					{
-						retcreate = RegOpenKeyExA(HKEY_CLASSES_ROOT, &str[indx + 5], 0, KEY_CREATE_SUB_KEY | KEY_CREATE_LINK, &hKey2);
+						retcreatelink = RegOpenKeyExA(HKEY_CLASSES_ROOT, &str[indx + 5], 0, KEY_CREATE_SUB_KEY | KEY_CREATE_LINK, &hKey2);
 
 						SET_VALUE = RegOpenKeyExA(HKEY_CLASSES_ROOT, &str[indx + 5], 0, KEY_SET_VALUE, &hKey2);
 
 						retdelete = RegOpenKeyExA(HKEY_CLASSES_ROOT, &str[indx + 5], 0, DELETE, &hKey2);
+
+						retcreate = RegOpenKeyExA(HKEY_CLASSES_ROOT, &str[indx + 5], 0, KEY_CREATE_SUB_KEY, &hKey2);
 					}
 
 					else if (str[indx + 2] == 'C' && str[indx + 3] == 'C')
 					{
-						retcreate = RegOpenKeyExA(HKEY_CURRENT_CONFIG, &str[indx + 5], 0, KEY_CREATE_SUB_KEY | KEY_CREATE_LINK, &hKey2);
+						retcreatelink = RegOpenKeyExA(HKEY_CURRENT_CONFIG, &str[indx + 5], 0, KEY_CREATE_SUB_KEY | KEY_CREATE_LINK, &hKey2);
 
 						SET_VALUE = RegOpenKeyExA(HKEY_CURRENT_CONFIG, &str[indx + 5], 0, KEY_SET_VALUE, &hKey2);
 
 						retdelete = RegOpenKeyExA(HKEY_CURRENT_CONFIG, &str[indx + 5], 0, DELETE, &hKey2);
 
+						retcreate = RegOpenKeyExA(HKEY_CURRENT_CONFIG, &str[indx + 5], 0, KEY_CREATE_SUB_KEY, &hKey2);
+
 					}
-					//打印
-					if (retdelete == ERROR_SUCCESS && retcreate == ERROR_SUCCESS&& SET_VALUE==ERROR_SUCCESS)
+					//打印权限
+					int z = 0;
+				    if (SET_VALUE == ERROR_SUCCESS)
 					{
-						printf("%s 可以被删除和创建符号链接以及设置键值\n", &str[indx]);
+						z = 1;
+						printf("设置键值 ");
 					}
-					else if (retdelete == ERROR_SUCCESS && retcreate == ERROR_SUCCESS)
+					if (retdelete == ERROR_SUCCESS)
 					{
-						printf("%s 可以被删除和创建符号链接\n", &str[indx]);
+						z = 1;
+						printf("删除 ");
 					}
-					else if (retcreate == ERROR_SUCCESS && SET_VALUE == ERROR_SUCCESS)
+					if (retcreatelink == ERROR_SUCCESS)
 					{
-						printf("%s 可以设置键值和创建符号链接\n", &str[indx]);
+						z = 1;
+						printf("创建符号链接 ");
 					}
-					else if(retdelete == ERROR_SUCCESS&& SET_VALUE == ERROR_SUCCESS)
+
+					if (retcreate == ERROR_SUCCESS)
 					{
-						printf("%s 可以被删除和设置键值\n", &str[indx]);
+						z = 1;
+						printf("创建子项 ");
 					}
-					else if(SET_VALUE == ERROR_SUCCESS)
+					if (z)
 					{
-						printf("%s 可以被设置键值\n", &str[indx]);
+						printf("%s \n", &str[indx]);
+						z = 0;
 					}
-					else if (retdelete == ERROR_SUCCESS)
-					{
-						printf("%s 可以被删除 \n", &str[indx]);
-					}
-					else if (retcreate == ERROR_SUCCESS)
-					{
-						printf("%s 可以被创建符号链接 \n", &str[indx]);
-					}
+					
 				}
 				//如果是文件路径
 				else
@@ -315,18 +322,18 @@ int main(int argc, char* argv[])
 						hFILE = CreateFileA(Dir, DELETE, FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
 
 						//如果没有DELETE权限也没有WRITE_DAC权限
-						if (hFILE == INVALID_HANDLE_VALUE&&!IsDirectoryWrite(Dir))
+						if (hFILE == INVALID_HANDLE_VALUE && !IsDirectoryWrite(Dir))
 						{
 							//该文件所在目录没有写入权限 不做记录
 							break;
 						}
-			
+
 						wchar_t  Dirw[0x1000];
 						swprintf(Dirw, 0x1000, L"%hs", Dir);
 
 
 						//为了能创建符号链接，必须先确保该目录下没有文件 否则设置挂载点将会返回错误145 
-	
+
 						if (!TraverseDirectory(Dirw))
 						{
 							printf("%s 该文件所在目录下有部分文件没有写入权限或者正在被其他程序独占中  \n", &str[indx]);
@@ -339,7 +346,7 @@ int main(int argc, char* argv[])
 						}
 						CloseHandle(hFILE);
 					}
-					else if( er == 0)
+					else if (er == 0)
 					{
 						printf("%s 该文件所在目录可以设置符号链接  \n", &str[indx]);
 					}
@@ -348,8 +355,8 @@ int main(int argc, char* argv[])
 			}
 		}
 
-	    num = 0;
-	    indx = 0;
+		num = 0;
+		indx = 0;
 	}
 
 
