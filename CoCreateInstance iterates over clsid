@@ -6,7 +6,12 @@
 //Set-ComDatabase .\com.db
 //Get-ComDatabase .\com.db -SetCurrent
 //$comdb = Get-CurrentComDatabase
-//$runas = Get-ComClass -ServerType LocalServer32 >>1.txt
+//Get-ComClass -ServerType LocalServer32  | ? RunAs -eq "Interactive User" | Select CLSID >>1.TXT
+
+//获取本地服务类appid
+//$comDb = Get-ComDatabase -PassThru
+//Set-ComDatabase -Path ComDb_old.db -Database $comDb 
+//$comDb.AppIDs.Values | Where-Object -FilterScript { $_.IsService -eq $True } | Select AppID >>1.TXT
 
 //该代码打开1.txt文件遍历clsid调用CoCreateInstance 打印能获得实例的clsid （以当前进程权限）
 
@@ -25,6 +30,7 @@
 #pragma warning(disable:4996)
 
 using namespace std;
+
 
 class __declspec(uuid("097ad6b8-203b-4506-a509-02e4b11b6bb5")) ICOMServerRegistrar : public IUnknown {
 public:
