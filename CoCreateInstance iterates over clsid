@@ -26,7 +26,6 @@
 
 using namespace std;
 
-
 class __declspec(uuid("097ad6b8-203b-4506-a509-02e4b11b6bb5")) ICOMServerRegistrar : public IUnknown {
 public:
     virtual HRESULT __stdcall Proc3(/* Stack Offset: 8 */ GUID* p0, /* Stack Offset: 16 */ IUnknown* p1, /* Stack Offset: 24 */ int64_t* p2);
