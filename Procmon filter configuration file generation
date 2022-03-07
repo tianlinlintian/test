@@ -169,8 +169,8 @@ void SearchKey(HKEY hKey, LPCTSTR lpSubKey, LPCTSTR lpSubKey2, DWORD ACCESS)
 {
 	HKEY hSubKey = NULL;
 	HKEY hSubKey2 = NULL;
-	WCHAR subKeyName[MAX_PATH + 1] = { 0 };
-	WCHAR subKeyName2[MAX_PATH + 1] = { 0 };
+	WCHAR subKeyName[0x2000] = { 0 };
+	WCHAR subKeyName2[0x2000] = { 0 };
 
 
 	if (ERROR_SUCCESS == RegOpenKeyExW(hKey, lpSubKey, 0, MAXIMUM_ALLOWED, &hSubKey))
@@ -204,7 +204,7 @@ void SearchKey(HKEY hKey, LPCTSTR lpSubKey, LPCTSTR lpSubKey2, DWORD ACCESS)
 				}
 				SearchKey(hSubKey, subKeyName, subKeyName2, ACCESS);
 			}
-			memset(subKeyName2, 0, MAX_PATH + 1);
+			memset(subKeyName2, 0, 0x2000);
 		}
 		//关闭
 		if (hSubKey)
