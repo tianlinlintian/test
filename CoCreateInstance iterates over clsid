@@ -1,4 +1,21 @@
-//该代码遍历具有appid的clsid 并在调用CoCreateInstance之后打印能获得实例的clsid （以当前进程权限）
+//该代码遍历具有1.txt的clsid 并在调用CoCreateInstance之后打印能获得实例的clsid （以当前进程权限）
+
+//1.txt格式类似如下
+//{2dcd7fdb-8809-48e4-8e4f-3157c57cf987}
+//{2f93c02d-77f9-46b4-95fb-8cbb81eeb62c}
+//{3480a401-bde9-4407-bc02-798a866ac051}
+//{33adc7d5-baf1-4661-9822-1fd23e63b39f}
+//{34dea897-7365-4f60-ba26-53da4b89226d}
+//{37987db6-9d85-4381-8d7d-3189661223d1}
+//{38e441fb-3d16-422f-8750-b2dacec5cefc}
+//{4aa0a5c4-1b9b-4f2e-99d7-99c6aec83474}
+//{4b7a83d5-cf71-40ad-ab0f-bf6830e95330}
+//{4d256db0-6c34-4ec1-9704-02182d6503a6}
+//..............
+//..............
+//..............
+//..............
+
 
 #include <stdio.h>
 #include <windows.h>
