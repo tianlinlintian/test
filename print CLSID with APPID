@@ -1,0 +1,162 @@
+//因为我不仅仅只对本地服务类的APPID感兴趣 所以我打印了所有具有AppId的CLSID
+
+
+#include <stdio.h>
+#include <windows.h>
+#include <string.h>
+#include <Aclapi.h>
+
+#pragma comment(lib, "ntdll")
+#pragma comment (lib,"Advapi32.lib")
+
+#pragma warning(disable:4996)
+
+DWORD GetRegKeyCount(HKEY hKey, DWORD dwIndex, TCHAR* achKey, DWORD dwKeyLen)
+{
+	LONG   lRet = ERROR_SUCCESS;
+	DWORD  cSubKeys = 0;
+	DWORD  cMaxKeyLens = 0;
+
+	lRet = RegQueryInfoKeyW(hKey, NULL, NULL, NULL, &cSubKeys, &cMaxKeyLens, NULL, NULL, NULL, NULL, NULL, NULL);
+	if (lRet != ERROR_SUCCESS)
+	{
+		return 0;
+	}
+
+	if (cSubKeys != 0 && achKey != NULL)
+	{
+		lRet = RegEnumKeyExW(
+			hKey,
+			dwIndex,
+			achKey,
+			&dwKeyLen,
+			NULL,
+			NULL,
+			NULL,
+			NULL
+		);
+		if (lRet != ERROR_SUCCESS)
+		{
+			return 0;
+		}
+	}
+	return cSubKeys;
+}
+
+int query(HKEY hKey) {
+	TCHAR    achKey[0X1000];   // buffer for subkey name  
+	DWORD    cbName;                   // size of name string   
+	TCHAR    achClass[0x1000] = TEXT("");  // buffer for class name   
+	DWORD    cchClassName = 0x1000;  // size of class string   
+	DWORD    cSubKeys = 0;               // number of subkeys   
+	DWORD    cbMaxSubKey;              // longest subkey size   
+	DWORD    cchMaxClass;              // longest class string   
+	DWORD    cValues;              // number of values for key   
+	DWORD    cchMaxValue;          // longest value name   
+	DWORD    cbMaxValueData;       // longest value data   
+	DWORD    cbSecurityDescriptor; // size of security descriptor   
+	FILETIME ftLastWriteTime;      // last write time   
+
+	DWORD i, ret;
+
+	TCHAR  achValue[0X1000];
+	DWORD cchValue = 0X1000;
+
+	// Get the class name and the value count.   
+	ret = RegQueryInfoKey(
+		hKey,                    // key handle   
+		achClass,                // buffer for class name   
+		&cchClassName,           // size of class string   
+		NULL,                    // reserved   
+		&cSubKeys,               // number of subkeys   
+		&cbMaxSubKey,            // longest subkey size   
+		&cchMaxClass,            // longest class string   
+		&cValues,                // number of values for this key   
+		&cchMaxValue,            // longest value name   
+		&cbMaxValueData,         // longest value data   
+		&cbSecurityDescriptor,   // security descriptor   
+		&ftLastWriteTime);       // last write time   
+
+	DWORD dwType = REG_BINARY | REG_DWORD | REG_EXPAND_SZ | REG_MULTI_SZ | REG_NONE | REG_SZ;
+	if (cValues&& ret== ERROR_SUCCESS)
+	{
+		for (size_t i = 0; i < cValues; i++)
+		{
+			achValue[0] = L'\0';
+			 ret = RegEnumValueW(hKey, i,
+				achValue,
+				&cchValue,
+				NULL,
+				NULL,
+				NULL,
+				NULL);
+			TCHAR szBuffer[0X1000] = { 0 };
+			DWORD dwNameLen = 0X1000;
+			if (ret == ERROR_SUCCESS)
+			{
+				ret = RegQueryValueExW(hKey, (WCHAR*)L"AppId", 0, &dwType, (LPBYTE)szBuffer, &dwNameLen);
+				if (ret == ERROR_SUCCESS&& szBuffer[0])
+				{
+					//printf("%S\n", szBuffer);
+					return 1;
+				}
+			}
+		}
+	}
+	return 0;
+}
+void SearchKey(HKEY hKey, LPCTSTR lpSubKey, LPCTSTR lpSubKey2, DWORD ACCESS)
+{
+	HKEY hSubKey = NULL;
+	HKEY hSubKey2 = NULL;
+	WCHAR subKeyName[0x1000] = { 0 };
+	WCHAR subKeyName2[0x1000] = { 0 };
+	WCHAR* p[0x1000];
+	int z = 0;
+	if (ERROR_SUCCESS == RegOpenKeyExW(hKey, lpSubKey, 0, MAXIMUM_ALLOWED, &hSubKey))
+	{
+		//获取lpSubKey下面有多少个子项
+		DWORD dwSubKey = GetRegKeyCount(hSubKey, 0, NULL, 0);
+
+		for (int i = 0; i < dwSubKey; i++)
+		{
+			if (ERROR_SUCCESS == RegEnumKeyW(hSubKey, i, subKeyName, MAX_PATH))
+			{
+				wcscat(subKeyName2, lpSubKey2);
+				wcscat(subKeyName2, L"\\");
+				wcscat(subKeyName2, subKeyName);
+				SearchKey(hSubKey, subKeyName, subKeyName2, ACCESS);
+
+			}
+			memset(subKeyName2, 0, MAX_PATH + 1);
+		}
+		if (query(hSubKey))
+		{
+			
+			WCHAR* lpSubKey2 = (WCHAR*)&lpSubKey[1];
+			lpSubKey2[0x24] = L'\0';
+			p[z] = lpSubKey2;
+			z++;
+			for (size_t i = 0; i < z; i++)
+			{
+				if (wcsstr(p[i], lpSubKey2)) {
+					printf("%S\n", &lpSubKey[1]);
+					break;
+				}
+			}
+		}
+		//关闭
+		if (hSubKey)
+		{
+			RegCloseKey(hSubKey);
+		}
+	}
+}
+
+int main() {
+
+	SearchKey(HKEY_CLASSES_ROOT, L"CLSID", L"CLSID", MAXIMUM_ALLOWED);
+
+	return 0;
+}
+
