@@ -1,5 +1,5 @@
-//因为我不仅仅只对本地服务类的APPID感兴趣 所以我打印了所有具有AppId的CLSID
-
+//我解析了pmc文件格式 本程序会将HKLM能创建注册表符号链接的项打印并生成pmc文件直接可以由Procmon导入
+//省去了不用手动一个个点击配置的麻烦
 
 #include <stdio.h>
 #include <windows.h>
@@ -132,18 +132,27 @@ void SearchKey(HKEY hKey, LPCTSTR lpSubKey, LPCTSTR lpSubKey2, DWORD ACCESS)
 		}
 		if (query(hSubKey))
 		{
-			
-			WCHAR* lpSubKey2 = (WCHAR*)&lpSubKey[1];
-			lpSubKey2[0x24] = L'\0';
-			p[z] = lpSubKey2;
-			z++;
-			for (size_t i = 0; i < z; i++)
+			UUID clsid;
+			CLSIDFromString(lpSubKey, &clsid);
+			IUnknown* p2;
+
+			HRESULT hr = CoCreateInstance(clsid, NULL, CLSCTX_LOCAL_SERVER, __uuidof(p2), (LPVOID*)&p2);
+			if (!hr)
 			{
-				if (wcsstr(p[i], lpSubKey2)) {
-					printf("%S\n", &lpSubKey[1]);
-					break;
-				}
+				printf("%S\n", lpSubKey);
+				/*WCHAR* lpSubKey2 = (WCHAR*)&lpSubKey[1];
+				lpSubKey2[0x24] = L'\0';
+				p[z] = lpSubKey2;
+				z++;
+				for (size_t i = 0; i < z; i++)
+				{
+					if (wcsstr(p[i], lpSubKey2)) {
+						printf("%S\n", &lpSubKey[1]);
+						break;
+					}
+				}*/
 			}
+			
 		}
 		//关闭
 		if (hSubKey)
@@ -154,9 +163,8 @@ void SearchKey(HKEY hKey, LPCTSTR lpSubKey, LPCTSTR lpSubKey2, DWORD ACCESS)
 }
 
 int main() {
-
+	CoInitializeEx(NULL, COINIT_MULTITHREADED);
 	SearchKey(HKEY_CLASSES_ROOT, L"CLSID", L"CLSID", MAXIMUM_ALLOWED);
 
 	return 0;
 }
-
