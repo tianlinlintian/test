@@ -1,4 +1,14 @@
-//获取时间运行时接口 本例用到的接口5474a982-e485-45bd-bb9c-d8fcce05ba7e为uuid,运行时间类名WindowsUpdate.Internal.InstallControl
+//获取类型为outprocess 的runtime class name PowerShell命令
+//cd  oleviewdotnet.exe所在目录
+//set-executionpolicy remotesigned
+//.\Startup-Module.ps1
+//Get-ComDatabase -SetCurrent
+//Set-ComDatabase .\com.db
+//Get-ComDatabase .\com.db -SetCurrent
+//$comdb = Get-CurrentComDatabase
+//Get-ComRuntimeClass -ActivationType OutOfProcess | Select Name >>1.txt
+
+//此代码为获取时间运行时接口例子 遍历1.txt中的runtime class name能初始化成功则打印
 
 #include<stdio.h>
 #include<windows.h>
