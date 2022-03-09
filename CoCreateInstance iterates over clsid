@@ -63,7 +63,7 @@ void th() {
         }
         if (n == 10)
         {
-            printf("%S 初始化接口时等待时间过长\n", buf2);
+            printf("初始化接口时等待时间过长\n");
             for (; i < num; i++)
             {
                 fgets(str, 0x1000, fp);
