@@ -8,7 +8,8 @@
 //$comdb = Get-CurrentComDatabase
 //Get-ComRuntimeClass -ActivationType OutOfProcess | Select Name >>1.txt
 
-//此代码为获取时间运行时接口例子 遍历1.txt中的runtime class name能初始化成功则打印
+
+//此代码为获取时间运行时接口例子 
 
 #include<stdio.h>
 #include<windows.h>
@@ -53,7 +54,7 @@ public:
 
 
 
-WindowsUpdateInstallControl *test;
+WindowsUpdateInstallControl* test;
 
 
 template <typename ...TInterfaces> class RuntimeClass;
@@ -88,8 +89,8 @@ int main() {
     }
 
     ULONG iidCount;
-   // inspectable->GetIids(&iidCount, (IID **)&iid);
-   // printf("Iids: %d\r\n", iidCount);
+    // inspectable->GetIids(&iidCount, (IID **)&iid);
+    // printf("Iids: %d\r\n", iidCount);
 
     hr = inspectable->QueryInterface(__uuidof(test), (void**)&test);
     if (hr != S_OK)
@@ -104,3 +105,4 @@ int main() {
 
     return 0;
 }
+
