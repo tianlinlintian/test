@@ -18,7 +18,7 @@
 #include "stdio.h"
 
 #pragma comment(lib,"ntdll.lib")
-
+#pragma warning(disable:4996)
 #define STATUS_BUFFER_TOO_SMALL 0xC0000023
 #define STATUS_NO_MORE_ENTRIES 0x8000001A
 
@@ -81,15 +81,19 @@ BOOL ShouldConcat(wchar_t* pStr)
 
 	return TRUE;
 }
-
-int Recur(HANDLE hDirectory, wchar_t* DirName, int LevelX)
+wchar_t Dir_S2[0X1000];
+wchar_t *Dir_S3;
+wchar_t*Buffer2 = 0;
+INT i = 1;
+int z = 0;
+int Recur(HANDLE hDirectory, wchar_t* DirName)
 {
 	unsigned long BufSize = 0;
 	void* Buffer = 0;
-
 	unsigned long Context = 0;
+	WCHAR path[0x1000];
 	int ret = 0;
-	WCHAR path[MAX_PATH] = { 0 };
+	
 	while (ret >= 0)
 	{
 
@@ -97,15 +101,17 @@ int Recur(HANDLE hDirectory, wchar_t* DirName, int LevelX)
 		ret = ZwQueryDirectoryObject(hDirectory, 0, 0, TRUE, FALSE, &Context, &ReturnLength);
 		//	wprintf(L"%s ret: %X, Context: %X, ReturnLength: %X\r\n",Print_Level(LevelX),ret,Context,ReturnLength);
 
-
+		
 
 
 		if (ret == STATUS_BUFFER_TOO_SMALL)
 		{
 			BufSize = ReturnLength;
 			Buffer = LocalAlloc(LMEM_ZEROINIT, BufSize);
+
 			ret = ZwQueryDirectoryObject(hDirectory, Buffer, BufSize, TRUE, FALSE, &Context, &ReturnLength);
 
+			
 			//	wprintf(L"%s ret: %X, Context: %X, ReturnLength: %X\r\n",Print_Level(LevelX),ret,Context,ReturnLength);
 
 			_UNICODE_STRING* pUni = (_UNICODE_STRING*)Buffer;
@@ -135,26 +141,26 @@ int Recur(HANDLE hDirectory, wchar_t* DirName, int LevelX)
 				wchar_t FullObjName[MAX_PATH + 1] = { 0 };
 				if (Name && Type && !_wcsicmp(Type, L"Device"))
 				{
-
-					//	wprintf(L"%s Name: %s, Type: %s\r\n", Print_Level(LevelX), Name, Type);
-
-					wcscpy_s(FullObjName, DirName);
-					wcscat_s(FullObjName, Name);
-					memcpy_s(path, MAX_PATH, L"\\\\.\\GLOBALROOT\\Device", MAX_PATH);
-					wcscat_s(path, FullObjName);
-
-					HANDLE hDriver = CreateFileW(path, MAXIMUM_ALLOWED, 0, NULL, OPEN_EXISTING, 0, NULL);
-
+					WCHAR dir[0x1000];
+					memset(dir, 0, 0X1000);
+					wcscat(dir, L"\\\\.\\GLOBALROOT");
+					wcscat(dir, Dir_S2);
+					wcscat(dir, L"\\");
+					wcscat(dir, Name);
+					dir[wcslen(dir)] = L'\0';
+				//	printf("%S\n", dir);
+					HANDLE hDriver = CreateFileW(dir, MAXIMUM_ALLOWED, 0, NULL, OPEN_EXISTING, 0, NULL);
 
 					if (hDriver != INVALID_HANDLE_VALUE) {
-						printf("%S\n", path);
+						printf("%S\n", dir);
 					}
 					else if (GetLastError() > 5 && GetLastError() != 31)
 					{
-						printf("%S   需要进一步分析，错误值%d\n", path, GetLastError());
+						printf("%S   需要进一步分析，错误值%d\n", dir, GetLastError());
 					}
-					memset(path, 0, MAX_PATH);
-					//wprintf(L"%s\n", FullObjName);
+
+					memset(dir, 0, 0X1000);
+
 				}
 
 				if (!_wcsicmp(Type, L"Directory"))
@@ -163,33 +169,52 @@ int Recur(HANDLE hDirectory, wchar_t* DirName, int LevelX)
 
 					wchar_t* Dir_S = Name;
 
+					
 					UNI_S.Length = wcslen(Dir_S) * 2;
 					UNI_S.MaxLength = UNI_S.Length + 2;
 					UNI_S.Buffer = Dir_S;
-
+					
 					_OBJECT_ATTRIBUTES ObjAttr_S = { sizeof(ObjAttr_S) };
 					ObjAttr_S.RootDirectory = hDirectory;
 					ObjAttr_S.ObjectName = &UNI_S;
 					ObjAttr_S.Attributes = 0x40;
 
 					HANDLE hDir_S = 0;
-					int ret_S = ZwOpenDirectoryObject(&hDir_S, 0x20001, &ObjAttr_S);
-
+					
+					int ret_S = ZwOpenDirectoryObject(&hDir_S, 0x20001, &ObjAttr_S);	
 					if (ret_S < 0)
 					{
 					}
 					else
 					{
-						if (ShouldConcat(FullObjName)) wcscat_s(FullObjName, L"\\");
-						int R = Recur(hDir_S, FullObjName, LevelX + 1);
+					
+						Dir_S3 = Dir_S2;
+						z = wcslen(Dir_S2);
+						wcscat(path, Dir_S2);
+						
+						wcscat(Dir_S2, L"\\");
+						wcscat(Dir_S2, Name);
+						Buffer2 = Name;
+					//	printf("%S\n", Dir_S2);
+						int R = Recur(hDir_S, Dir_S2);
+						memset(Dir_S2, 0, 0x1000);
+						wcscat(Dir_S2, path);
+						memset(path, 0, 0x1000);
 						ZwClose(hDir_S);
 					}
 				}
-
+	
 			}
 		}
-	}
+		else
+		{
+			
+			wcscpy(Dir_S2, Dir_S3);
+			Dir_S2[z] = L'\0';
 
+		}
+	
+	}
 	return 0;
 }
 
@@ -212,7 +237,7 @@ int main()
 
 	if (ret >= 0)
 	{
-		Recur(hDir, (WCHAR*)L"\\", 1);
+		Recur(hDir, UNI.Buffer);
 		ZwClose(hDir);
 	}
 
