@@ -1,0 +1,156 @@
+//微软发布的补丁都会修补漏洞文件(触发忘记了），那么文件大小也会随之该变
+//本程序而是对比文件目录 如果有文件大小改动则打印  对比的文件可以是安装补丁后拷贝修改日期有改动的所有文件
+
+#include <stdio.h>
+#include <string.h>
+#include <iostream>
+#include <locale.h>
+#include <atlstr.h>
+#include "windows.h"
+#include <Strsafe.h>
+using namespace std;
+#pragma warning(disable:4996)
+#pragma comment(lib, "version")
+
+
+
+void TraverseDirectory2(CHAR Dir[MAX_PATH],CHAR NAME[MAX_PATH],ULONG64 SIZE)
+{
+	WIN32_FIND_DATAA FindFileData;
+	HANDLE hFind = INVALID_HANDLE_VALUE;
+	CHAR DirSpec[MAX_PATH];                  //定义要遍历的文件夹的目录
+	DWORD dwError;
+	StringCchCopyA(DirSpec, MAX_PATH, Dir);
+	StringCchCatA(DirSpec, MAX_PATH, ("\\*"));   //定义要遍历的文件夹的完整路径\*
+
+	hFind = FindFirstFileA(DirSpec, &FindFileData);          //找到文件夹中的第一个文件
+
+	if (hFind == INVALID_HANDLE_VALUE)                               //如果hFind句柄创建失败，输出错误信息
+	{
+		FindClose(hFind);
+		return;
+	}
+	else
+	{
+		while (FindNextFileA(hFind, &FindFileData) != 0)                            //当文件或者文件夹存在时
+		{
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 && strcmp(FindFileData.cFileName, ".") == 0 || strcmp(FindFileData.cFileName, "..") == 0)        //判断是文件夹&&表示为"."||表示为"."
+			{
+				continue;
+			}
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)      //判断如果是文件夹
+			{
+				char DirAdd[MAX_PATH];
+				StringCchCopyA(DirAdd, MAX_PATH, Dir);
+				StringCchCatA(DirAdd, MAX_PATH, "\\");
+				StringCchCatA(DirAdd, MAX_PATH, FindFileData.cFileName);       //拼接得到此文件夹的完整路径
+				TraverseDirectory2(DirAdd, NAME, SIZE);                                  //实现递归调用
+			}
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)    //如果不是文件夹
+			{
+				CHAR p[1000] = { 0 };
+				strcpy(p, Dir);
+				strcat(p, "\\");
+				strcat(p, FindFileData.cFileName);
+				if (!strcmp(FindFileData.cFileName,NAME))
+				{
+					HANDLE pFile = CreateFileA(p, GENERIC_READ,
+						FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+						NULL,
+						OPEN_EXISTING,
+						FILE_ATTRIBUTE_NORMAL,
+						NULL);
+					if (pFile == (HANDLE)-1)
+					{
+						continue;
+					}
+					LARGE_INTEGER li;
+					GetFileSizeEx(pFile, &li);
+					UINT64 uFileSize = li.QuadPart;
+					//printf("%I64u\n", uFileSize);//打印字节
+					if (SIZE != uFileSize)
+					{
+						printf("%s\n", p);
+					}
+					CloseHandle(pFile);
+				}
+				memset(p, 0, 1000);
+			}
+
+		}
+		FindClose(hFind);
+	}
+}
+
+
+
+void TraverseDirectory(CHAR Dir[MAX_PATH], CHAR Dir2[MAX_PATH])
+{
+	WIN32_FIND_DATAA FindFileData;
+	HANDLE hFind = INVALID_HANDLE_VALUE;
+	CHAR DirSpec[MAX_PATH];                  //定义要遍历的文件夹的目录
+	DWORD dwError;
+	StringCchCopyA(DirSpec, MAX_PATH, Dir);
+	StringCchCatA(DirSpec, MAX_PATH, ("\\*"));   //定义要遍历的文件夹的完整路径\*
+
+	hFind = FindFirstFileA(DirSpec, &FindFileData);          //找到文件夹中的第一个文件
+
+	if (hFind == INVALID_HANDLE_VALUE)                               //如果hFind句柄创建失败，输出错误信息
+	{
+		FindClose(hFind);
+		return;
+	}
+	else
+	{
+		while (FindNextFileA(hFind, &FindFileData) != 0)                            //当文件或者文件夹存在时
+		{
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 && strcmp(FindFileData.cFileName, ".") == 0 || strcmp(FindFileData.cFileName, "..") == 0)        //判断是文件夹&&表示为"."||表示为"."
+			{
+				continue;
+			}
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)      //判断如果是文件夹
+			{
+				char DirAdd[MAX_PATH];
+				StringCchCopyA(DirAdd, MAX_PATH, Dir);
+				StringCchCatA(DirAdd, MAX_PATH, "\\");
+				StringCchCatA(DirAdd, MAX_PATH, FindFileData.cFileName);       //拼接得到此文件夹的完整路径
+				TraverseDirectory(DirAdd,Dir2);                                  //实现递归调用
+			}
+			if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)    //如果不是文件夹
+			{
+				CHAR p[1000] = { 0 };
+				strcpy(p, Dir);
+				strcat(p, "\\");
+				strcat(p, FindFileData.cFileName);
+				HANDLE pFile = CreateFileA(p, GENERIC_READ,
+					FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+					NULL,
+					OPEN_EXISTING,
+					FILE_ATTRIBUTE_NORMAL,
+					NULL);
+				if (pFile == (HANDLE)-1)
+				{
+					continue;
+				}
+				LARGE_INTEGER li;
+				GetFileSizeEx(pFile, &li);
+				UINT64 uFileSize = li.QuadPart;
+				//printf("%I64u\n", uFileSize);//打印字节
+				CloseHandle(pFile);
+				TraverseDirectory2(Dir2, FindFileData.cFileName, uFileSize);
+				memset(p, 0, 1000);
+			}
+
+		}
+		FindClose(hFind);
+	}
+}
+
+int main() {
+
+	//传入两个文件目录，作为对比的目录
+	TraverseDirectory((char*)"C:\\Windows\\system32\\drivers", (char*)"C:\\1");
+	printf("ok\n");
+	getchar();
+	return 0;
+}
