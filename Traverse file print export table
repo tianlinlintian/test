@@ -1,5 +1,5 @@
 //查看Acrobat Reader DC 文件中的导出表
-//一种是遍历Acrobat Reader文件夹中所有文件的导出表 一种只差看Acrobat Reader进程加载的dll的导出表
+//一种是遍历Acrobat Reader文件夹中所有文件的导出表 一种是只查看Acrobat Reader进程加载的dll的导出表
 
 
 #include <windows.h>
