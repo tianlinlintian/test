@@ -166,7 +166,7 @@ int Recur(HANDLE hDirectory, wchar_t* DirName)
 						}
 						RevertToSelf();
 					}
-				
+
 					memset(dir, 0, 0X1000);
 
 				}
@@ -324,7 +324,7 @@ int main()
 	memset(buf, 0, 0xffffff);
 
 	QueryDosDeviceA(NULL, buf, 0xffffff);
-
+	ImpersonateLoggedOnUser(hToken);
 	for (size_t i = 0; i < 0xffffff; i++)
 	{
 		if (buf[i] == 0 && buf[i + 1] != 0)
@@ -343,10 +343,13 @@ int main()
 				printf("%s   需要进一步分析，错误值%d\n", path, GetLastError());
 			}
 			memset(path, 0, MAX_PATH);
-
 		}
 	}
+
+	RevertToSelf();
 
 
 	return 0;
 }
+
+
