@@ -12,6 +12,7 @@
 //由于只是获得通信名字，进一步发送ioctl需要拥有权限(https://docs.microsoft.com/en-us/windows-hardware/drivers/storage/acls-and-the-device-stack)
 //如果以成功发送ioctl为目的，从方便角度上看，MAXIMUM_ALLOWED改为GENERIC_WRITE | MAXIMUM_ALLOWED是更好的选择
 
+//以管理员权限运行
 
 
 #include "windows.h"
@@ -82,8 +83,10 @@ BOOL ShouldConcat(wchar_t* pStr)
 	return TRUE;
 }
 wchar_t Dir_S2[0X1000];
-wchar_t *Dir_S3;
-wchar_t*Buffer2 = 0;
+
+HANDLE hToken;
+wchar_t* Dir_S3;
+wchar_t* Buffer2 = 0;
 INT i = 1;
 int z = 0;
 int Recur(HANDLE hDirectory, wchar_t* DirName)
@@ -93,7 +96,7 @@ int Recur(HANDLE hDirectory, wchar_t* DirName)
 	unsigned long Context = 0;
 	WCHAR path[0x1000];
 	int ret = 0;
-	
+
 	while (ret >= 0)
 	{
 
@@ -101,7 +104,7 @@ int Recur(HANDLE hDirectory, wchar_t* DirName)
 		ret = ZwQueryDirectoryObject(hDirectory, 0, 0, TRUE, FALSE, &Context, &ReturnLength);
 		//	wprintf(L"%s ret: %X, Context: %X, ReturnLength: %X\r\n",Print_Level(LevelX),ret,Context,ReturnLength);
 
-		
+
 
 
 		if (ret == STATUS_BUFFER_TOO_SMALL)
@@ -111,7 +114,7 @@ int Recur(HANDLE hDirectory, wchar_t* DirName)
 
 			ret = ZwQueryDirectoryObject(hDirectory, Buffer, BufSize, TRUE, FALSE, &Context, &ReturnLength);
 
-			
+
 			//	wprintf(L"%s ret: %X, Context: %X, ReturnLength: %X\r\n",Print_Level(LevelX),ret,Context,ReturnLength);
 
 			_UNICODE_STRING* pUni = (_UNICODE_STRING*)Buffer;
@@ -148,17 +151,22 @@ int Recur(HANDLE hDirectory, wchar_t* DirName)
 					wcscat(dir, L"\\");
 					wcscat(dir, Name);
 					dir[wcslen(dir)] = L'\0';
-				//	printf("%S\n", dir);
-					HANDLE hDriver = CreateFileW(dir, MAXIMUM_ALLOWED, 0, NULL, OPEN_EXISTING, 0, NULL);
+					//	printf("%S\n", dir);
 
-					if (hDriver != INVALID_HANDLE_VALUE) {
-						printf("%S\n", dir);
-					}
-					else if (GetLastError() > 5 && GetLastError() != 31)
+					if (ImpersonateLoggedOnUser(hToken))
 					{
-						printf("%S   需要进一步分析，错误值%d\n", dir, GetLastError());
-					}
+						HANDLE hDriver = CreateFileW(dir, MAXIMUM_ALLOWED, 0, NULL, OPEN_EXISTING, 0, NULL);
 
+						if (hDriver != INVALID_HANDLE_VALUE) {
+							printf("%S\n", dir);
+						}
+						else if (GetLastError() > 5 && GetLastError() != 31)
+						{
+							printf("%S   需要进一步分析，错误值%d\n", dir, GetLastError());
+						}
+						RevertToSelf();
+					}
+				
 					memset(dir, 0, 0X1000);
 
 				}
@@ -169,33 +177,33 @@ int Recur(HANDLE hDirectory, wchar_t* DirName)
 
 					wchar_t* Dir_S = Name;
 
-					
+
 					UNI_S.Length = wcslen(Dir_S) * 2;
 					UNI_S.MaxLength = UNI_S.Length + 2;
 					UNI_S.Buffer = Dir_S;
-					
+
 					_OBJECT_ATTRIBUTES ObjAttr_S = { sizeof(ObjAttr_S) };
 					ObjAttr_S.RootDirectory = hDirectory;
 					ObjAttr_S.ObjectName = &UNI_S;
 					ObjAttr_S.Attributes = 0x40;
 
 					HANDLE hDir_S = 0;
-					
-					int ret_S = ZwOpenDirectoryObject(&hDir_S, 0x20001, &ObjAttr_S);	
+
+					int ret_S = ZwOpenDirectoryObject(&hDir_S, 0x20001, &ObjAttr_S);
 					if (ret_S < 0)
 					{
 					}
 					else
 					{
-					
+
 						Dir_S3 = Dir_S2;
 						z = wcslen(Dir_S2);
-						wcscat(path, Dir_S2);
-						
+						wcscpy(path, Dir_S2);
+
 						wcscat(Dir_S2, L"\\");
 						wcscat(Dir_S2, Name);
 						Buffer2 = Name;
-					//	printf("%S\n", Dir_S2);
+						//	printf("%S\n", Dir_S2);
 						int R = Recur(hDir_S, Dir_S2);
 						memset(Dir_S2, 0, 0x1000);
 						wcscat(Dir_S2, path);
@@ -203,24 +211,94 @@ int Recur(HANDLE hDirectory, wchar_t* DirName)
 						ZwClose(hDir_S);
 					}
 				}
-	
+
 			}
 		}
 		else
 		{
-			
+
 			wcscpy(Dir_S2, Dir_S3);
 			Dir_S2[z] = L'\0';
 
 		}
-	
+
+	}
+	return 0;
+}
+int ShowProcessIntegrityLevel(int pid)
+{
+
+	HANDLE hProcess;
+
+	DWORD dwLengthNeeded;
+	DWORD dwError = ERROR_SUCCESS;
+
+	PTOKEN_MANDATORY_LABEL pTIL = NULL;
+	LPWSTR pStringSid;
+	DWORD dwIntegrityLevel;
+
+	if (OpenProcessToken(OpenProcess(MAXIMUM_ALLOWED, 0, pid), MAXIMUM_ALLOWED, &hToken))
+	{
+		// Get the Integrity level.
+		if (!GetTokenInformation(hToken, TokenIntegrityLevel,
+			NULL, 0, &dwLengthNeeded))
+		{
+			dwError = GetLastError();
+			if (dwError == ERROR_INSUFFICIENT_BUFFER)
+			{
+				pTIL = (PTOKEN_MANDATORY_LABEL)LocalAlloc(0,
+					dwLengthNeeded);
+				if (pTIL != NULL)
+				{
+					if (GetTokenInformation(hToken, TokenIntegrityLevel,
+						pTIL, dwLengthNeeded, &dwLengthNeeded))
+					{
+						dwIntegrityLevel = *GetSidSubAuthority(pTIL->Label.Sid,
+							(DWORD)(UCHAR)(*GetSidSubAuthorityCount(pTIL->Label.Sid) - 1));
+
+						if (dwIntegrityLevel < SECURITY_MANDATORY_MEDIUM_RID)
+						{
+							// Low Integrity
+							//wprintf(L"Low Process");
+						}
+						else if (dwIntegrityLevel >= SECURITY_MANDATORY_MEDIUM_RID &&
+							dwIntegrityLevel < SECURITY_MANDATORY_HIGH_RID)
+						{
+							// Medium Integrity
+							//wprintf(L"Medium Process");
+
+							if (ImpersonateLoggedOnUser(hToken))
+							{
+								RevertToSelf();
+								return 1;
+							}
+						}
+						else if (dwIntegrityLevel >= SECURITY_MANDATORY_HIGH_RID)
+						{
+							// High Integrity
+							//wprintf(L"High Integrity Process");
+						}
+					}
+					LocalFree(pTIL);
+				}
+			}
+		}
+		CloseHandle(hToken);
 	}
 	return 0;
 }
 
+
 int main()
 {
-
+	//获取一个medium进程的token 当调用createfile再模拟
+	for (size_t i = 0; i < 12345; i++)
+	{
+		if (ShowProcessIntegrityLevel(i))
+		{
+			break;
+		}
+	}
 	_UNICODE_STRING UNI = { 0 };
 	wchar_t* Dir = (WCHAR*)L"\\";
 	UNI.Length = wcslen(Dir) * 2;
@@ -240,7 +318,6 @@ int main()
 		Recur(hDir, UNI.Buffer);
 		ZwClose(hDir);
 	}
-
 	char* buf = (char*)malloc(0xffffff);
 	char path[MAX_PATH] = { 0 };
 	HANDLE hDriver = NULL;
@@ -269,6 +346,7 @@ int main()
 
 		}
 	}
+
 
 	return 0;
 }
