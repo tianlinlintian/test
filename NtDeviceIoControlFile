@@ -22,6 +22,19 @@ typedef NTSTATUS(NTAPI* NtDeviceIoControlFile)(
     PVOID            OutputBuffer,
     ULONG            OutputBufferLength
     );
+typedef NTSTATUS(NTAPI* NtFsControlFile)(
+         HANDLE           FileHandle,
+         HANDLE           Event,
+         PVOID  ApcRoutine,
+         PVOID            ApcContext,
+         PIO_STATUS_BLOCK IoStatusBlock,
+         ULONG            FsControlCode,
+         PVOID            InputBuffer,
+         ULONG            InputBufferLength,
+         PVOID            OutputBuffer,
+         ULONG            OutputBufferLength
+);
+NtFsControlFile TNtFsControlFile;
 
 int main() {
 
@@ -36,11 +49,7 @@ int main() {
     IO_STATUS_BLOCK p = {};
 
     NtDeviceIoControlFile tDeviceIoControl = (NtDeviceIoControlFile)GetProcAddress(GetModuleHandleW(L"ntdll"), "NtDeviceIoControlFile");
-
-    if (!tDeviceIoControl) {
-        printf("[-] Fail to resolve ZwDeviceIoControlFile(0x%X)\n", GetLastError());
-        getchar();
-    }
+    TNtFsControlFile = (NtFsControlFile)GetProcAddress(GetModuleHandleW(L"ntdll"), "NtFsControlFile");
 
     DWORD Buffer[0x20000]{};
 
