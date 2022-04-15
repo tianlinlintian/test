@@ -34,12 +34,12 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT  DriverObject, PUNICODE_STRING RegistryPath)
     while (process_address)
     {
         //  DbgPrint("%llx\n", (DWORD64)process_address + 0x87A);
-
-        if (*(CHAR*)((DWORD64)process_address + Protection))
+        
+        if (*(CHAR*)((DWORD64)process_address + 0x87A))
         {
-            *(CHAR*)((DWORD64)process_address + Protection) = 0;
-            process_pid = *(DWORD64*)((DWORD64)process_address + pid_offset);
-            DbgPrint("process_pid %ld\n", process_pid);
+            *(CHAR*)((DWORD64)process_address + 0x87A) = 0;
+            process_pid = *(DWORD32*)((DWORD64)process_address + 0x548) ;
+            DbgPrint("process_pid %ld\n",process_pid);
         }
         process_list = process_list->Flink;
         process_address = (PEPROCESS)((UINT64)(process_list)-list_offset);
