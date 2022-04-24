@@ -7,9 +7,51 @@
 #include <atlstr.h>
 #pragma warning(disable:4996)
 
+enum Privilege {
+    Privilege_from_the_start,
+    SeCreateTokenPrivilege,
+    SeAssignPrimaryTokenPrivilege,
+    SeLockMemoryPrivilege,
+    SeIncreaseQuotaPrivilege,
+    SeUnsolicitedInputPrivilege,
+    SeMachineAccountPrivilege,
+    SeTcbPrivilege,
+    SeSecurityPrivilege,
+    SeTakeOwnershipPrivilege,
+    SeLoadDriverPrivilege,
+    SeSystemProfilePrivilege,
+    SeSystemtimePrivilege,
+    SeProfileSingleProcessPrivilege,
+    SeIncreaseBasePriorityPrivilege,
+    SeCreatePagefilePrivilege,
+    SeCreatePermanentPrivilege,
+    SeBackupPrivilege,
+    SeRestorePrivilege,
+    SeShutdownPrivilege,
+    SeDebugPrivilege,
+    SeAuditPrivilege,
+    SeSystemEnvironmentPrivilege,
+    SeChangeNotifyPrivilege,
+    SeRemoteShutdownPrivilege,
+    SeUndockPrivilege,
+    SeSyncAgentPrivilege,
+    SeEnableDelegationPrivilege,
+    SeManageVolumePrivilege,
+    SeImpersonatePrivilege,
+    SeCreateGlobalPrivilege,
+    SeTrustedCredManAccessPrivilege,
+    SeRelabelPrivilege,
+    SeIncreaseWorkingSetPrivilege,
+    SeTimeZonePrivilege,
+    SeCreateSymbolicLinkPrivilege,
+    SeDelegateSessionUserImpersonatePrivilege,
+};
+
+
+
 BOOL SetPrivilege(
     HANDLE hToken,          // access token handle
-    LPCTSTR lpszPrivilege,  // name of privilege to enable/disable
+    LPCWSTR lpszPrivilege,  // name of privilege to enable/disable
     BOOL bEnablePrivilege   // to enable or disable privilege
 )
 {
@@ -18,7 +60,7 @@ BOOL SetPrivilege(
 
     if (!LookupPrivilegeValueW(
         NULL,            // lookup privilege on local system
-        lpszPrivilege,   // privilege to lookup 
+        (LPCWSTR)lpszPrivilege,   // privilege to lookup 
         &luid))        // receives LUID of privilege
     {
         printf("LookupPrivilegeValue error:  %d\n", GetLastError());
@@ -63,7 +105,7 @@ int main()
 
     OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS_P, &token);
 
-    SetPrivilege(token, L"SeDebugPrivilege", 1);
+    SetPrivilege(token, (LPCWSTR)L"SeDebugPrivilege", 1);
 
     DWORD dwPId = 0;
     DWORD n = 0;
@@ -86,7 +128,7 @@ int main()
 
 
     HANDLE        hModuleSnap = INVALID_HANDLE_VALUE;
-    MODULEENTRY32 me32 = { sizeof(MODULEENTRY32) };
+    MODULEENTRY32W me32 = { sizeof(MODULEENTRY32W) };
 
     hModuleSnap = CreateToolhelp32Snapshot(
         TH32CS_SNAPMODULE,
@@ -97,13 +139,13 @@ int main()
         return false;
     }
 
-    if (!Module32First(hModuleSnap, &me32)) {
+    if (!Module32FirstW(hModuleSnap, &me32)) {
         printf("Module32First error%d \n", GetLastError());
         CloseHandle(hModuleSnap);
         return false;
     }
     WCHAR lpFileName[MAX_PATH];
- 
+
     do {
         pFile = CreateFileW(me32.szExePath, GENERIC_READ,
             FILE_SHARE_READ,
@@ -130,9 +172,11 @@ int main()
 
         }
 
-    } while (Module32Next(hModuleSnap, &me32));
+    } while (Module32NextW(hModuleSnap, &me32));
 
     CloseHandle(hModuleSnap);
 
     return 0;
 }
+
+
