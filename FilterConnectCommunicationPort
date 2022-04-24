@@ -1,0 +1,48 @@
+//powershell获取过滤驱动端口通信名称
+
+//Install - Module - Name NtObjectManager - RequiredVersion 1.1.29
+//Import - Module  NtObjectManager
+//$ports = ls NtObject : \ | Where - Object TypeName - eq "FilterConnectionPort"
+//foreach($port in $ports.Name) { Write - Host "\$port" Use - NtObject($p = Get - FilterConnectionPort "\$port") {} }
+
+
+#include <stdio.h>
+#include <windows.h>
+#include <fltUser.h>
+#include <fltdefs.h>
+#pragma comment(lib, "ntdll")
+#pragma comment(lib, "FltLib.lib")
+void th() {
+  
+    
+}   
+int main() {
+    HANDLE hd = NULL  ;
+
+    ULONG ret=FilterConnectCommunicationPort(L"\\??", 0, 0, 0, 0, &hd);
+
+    if (hd)
+    {
+        printf("FilterConnectCommunicationPort OK\n");
+    }
+    else
+    {
+        printf("FilterConnectCommunicationPort error %x\n", ret);
+    }
+    DWORD inbuf[0x200];
+    DWORD outbuf[0x200];
+    ULONG size = 0;
+    ret = FilterSendMessage(hd, inbuf, 0x200, outbuf, 0x200, &size);
+
+    if (S_OK== ret)
+    {
+        printf("FilterSendMessage OK\n");
+    }
+    else
+    {
+        printf("FilterSendMessage error %x\n", ret);
+    }
+    getchar();
+
+    return 0;
+}
