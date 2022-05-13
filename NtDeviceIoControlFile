@@ -38,7 +38,7 @@ NtFsControlFile TNtFsControlFile;
 
 int main() {
 
-    HANDLE hDriver = CreateFileA("\\\\.\\GLOBALROOT\\Device\\?", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hDriver = CreateFileA("\\\\.\\GLOBALROOT\\Device\\?", MAXIMUM_ALLOWED, 0, NULL, OPEN_EXISTING, 0, NULL);
     ULONG dw;
 
     if (hDriver == INVALID_HANDLE_VALUE) {
