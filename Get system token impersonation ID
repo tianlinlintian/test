@@ -251,8 +251,12 @@ HANDLE CaptureImpersonationToken()
 
 
 int main(int argc, char* argv[]) {
-	HANDLE token = CaptureImpersonationToken();
-    printf("Complete program \n");
+    HANDLE token = CaptureImpersonationToken();
+    
+    if (ImpersonateLoggedOnUser(token))
+    {
+    	printf("ok");
+    }
 
     getchar();
 
