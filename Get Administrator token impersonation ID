@@ -112,9 +112,7 @@ _tmain(
     szUsername = (LPTSTR)L"Administrator";
 
  
-    //
-    // Activate the TCB privilege
-    //
+ 
     hProcess = GetCurrentProcess();
     OpenProcessToken(hProcess, MAXIMUM_ALLOWED, &hToken);
 
@@ -124,9 +122,7 @@ _tmain(
     buf_size = sizeof buf - 1;
     GetComputerName(buf, &buf_size);
     szDomain = buf;
-    //
-    // Connect (Untrusted) to LSA
-    //
+
     Status = LsaConnectUntrusted(&hLsa);
     if (Status != STATUS_SUCCESS)
     {
@@ -148,29 +144,16 @@ _tmain(
     pbPosition = InitUnicodeString(&pS4uLogon->ClientUpn, szUsername, pbPosition);
     pbPosition = InitUnicodeString(&pS4uLogon->ClientRealm, buf, pbPosition);
 
-    //
-    // Misc
-    //
+  
     strcpy_s(TokenSource.SourceName, TOKEN_SOURCE_LENGTH, "NT.NET");
     InitLsaString(&OriginName, (LPSTR)"S4U");
     AllocateLocallyUniqueId(&TokenSource.SourceIdentifier);
 
-    //
-    // Add extra SID to token.
-    //
-    // If the application needs to connect to a Windows Desktop, Logon SID must be added to the Token.
-    //
+
     pGroups = NULL;
 
 
-    //
-    // Call LSA LsaLogonUser
-    //
-    // This call required SeTcbPrivilege privilege:
-    //    - [1] to get a primary token (vs impersonation token). The privilege MUST be activated.
-    //    - [2] to add supplemental SID with LocalGroups parameter.
-    //    - [3] to use a username with a domain name different from machine name (or '.').
-    //
+  
     Status = LsaLogonUser(
         hLsa,
         &OriginName,
@@ -196,6 +179,11 @@ _tmain(
     else
     {
         printf("token   %x\n", TokenSource);
+    }
+    
+    if (ImpersonateLoggedOnUser(TokenSource))
+    {
+    	printf("ok");
     }
 
     getchar();
