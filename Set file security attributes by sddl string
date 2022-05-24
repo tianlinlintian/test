@@ -10,20 +10,24 @@
 #include <winternl.h>
 #pragma comment(lib, "ntdll.lib")
 
-BOOL CreateMyDACL(SECURITY_ATTRIBUTES* pSA,CHAR* szSD)
+BOOL CreateMyDACL(SECURITY_ATTRIBUTES* pSA, CHAR* szSD)
 {
-    if (NULL == pSA)
-        return FALSE;
-    if (!ConvertStringSecurityDescriptorToSecurityDescriptorA( 
-        szSD,
-        SDDL_REVISION_1,
-        &(pSA->lpSecurityDescriptor),
-        NULL)) {
-            printf("Failed CreateMyDACL\n");
-            getchar();
-            exit(1);
-    }
-    return TRUE;
+	if (NULL == pSA)
+	{
+		printf("Failed CreateMyDACL\n");
+	}
+
+	if (!ConvertStringSecurityDescriptorToSecurityDescriptorA(
+		szSD,
+		SDDL_REVISION_1,
+		&(pSA->lpSecurityDescriptor),
+		NULL)) {
+		printf("Failed CreateMyDACL\n");
+		getchar();
+		exit(1);
+	}
+
+	return TRUE;
 }
 
 void main()
@@ -36,7 +40,6 @@ void main()
 
     if (!CreateMyDACL(&sa, (CHAR*)"D:(D;;DT;;;WD)(A;;GA;;;WD)"))
     {
-        printf("Failed CreateMyDACL\n");
         getchar();
         exit(1);
     }
@@ -46,7 +49,6 @@ void main()
 
     if (!CreateMyDACL(&sa, (CHAR*)"D:(A;;GR;;;WD)(A;;GA;;;BA)(A;;0;;;OW)"))
     {
-        printf("Failed CreateMyDACL\n");
         getchar();
         exit(1);
     }
