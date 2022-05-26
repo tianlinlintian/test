@@ -47,7 +47,41 @@ enum Privilege {
     SeDelegateSessionUserImpersonatePrivilege,
 };
 
-
+#define CONST_LUID(x1, x2) {x1, x2}
+const LUID SeCreateTokenPrivilege = CONST_LUID(SE_CREATE_TOKEN_PRIVILEGE, 0);
+const LUID SeAssignPrimaryTokenPrivilege = CONST_LUID(SE_ASSIGNPRIMARYTOKEN_PRIVILEGE, 0);
+const LUID SeLockMemoryPrivilege = CONST_LUID(SE_LOCK_MEMORY_PRIVILEGE, 0);
+const LUID SeIncreaseQuotaPrivilege = CONST_LUID(SE_INCREASE_QUOTA_PRIVILEGE, 0);
+const LUID SeUnsolicitedInputPrivilege = CONST_LUID(6, 0);
+const LUID SeTcbPrivilege = CONST_LUID(SE_TCB_PRIVILEGE, 0);
+const LUID SeSecurityPrivilege = CONST_LUID(SE_SECURITY_PRIVILEGE, 0);
+const LUID SeTakeOwnershipPrivilege = CONST_LUID(SE_TAKE_OWNERSHIP_PRIVILEGE, 0);
+const LUID SeLoadDriverPrivilege = CONST_LUID(SE_LOAD_DRIVER_PRIVILEGE, 0);
+const LUID SeSystemProfilePrivilege = CONST_LUID(SE_SYSTEM_PROFILE_PRIVILEGE, 0);
+const LUID SeSystemtimePrivilege = CONST_LUID(SE_SYSTEMTIME_PRIVILEGE, 0);
+const LUID SeProfileSingleProcessPrivilege = CONST_LUID(SE_PROF_SINGLE_PROCESS_PRIVILEGE, 0);
+const LUID SeIncreaseBasePriorityPrivilege = CONST_LUID(SE_INC_BASE_PRIORITY_PRIVILEGE, 0);
+const LUID SeCreatePagefilePrivilege = CONST_LUID(SE_CREATE_PAGEFILE_PRIVILEGE, 0);
+const LUID SeCreatePermanentPrivilege = CONST_LUID(SE_CREATE_PERMANENT_PRIVILEGE, 0);
+const LUID SeBackupPrivilege = CONST_LUID(SE_BACKUP_PRIVILEGE, 0);
+const LUID SeRestorePrivilege = CONST_LUID(SE_RESTORE_PRIVILEGE, 0);
+const LUID SeShutdownPrivilege = CONST_LUID(SE_SHUTDOWN_PRIVILEGE, 0);
+const LUID SeDebugPrivilege = CONST_LUID(SE_DEBUG_PRIVILEGE, 0);
+const LUID SeAuditPrivilege = CONST_LUID(SE_AUDIT_PRIVILEGE, 0);
+const LUID SeSystemEnvironmentPrivilege = CONST_LUID(SE_SYSTEM_ENVIRONMENT_PRIVILEGE, 0);
+const LUID SeChangeNotifyPrivilege = CONST_LUID(SE_CHANGE_NOTIFY_PRIVILEGE, 0);
+const LUID SeRemoteShutdownPrivilege = CONST_LUID(SE_REMOTE_SHUTDOWN_PRIVILEGE, 0);
+const LUID SeUndockPrivilege = CONST_LUID(SE_UNDOCK_PRIVILEGE, 0);
+const LUID SeSyncAgentPrivilege = CONST_LUID(SE_SYNC_AGENT_PRIVILEGE, 0);
+const LUID SeEnableDelegationPrivilege = CONST_LUID(SE_ENABLE_DELEGATION_PRIVILEGE, 0);
+const LUID SeManageVolumePrivilege = CONST_LUID(SE_MANAGE_VOLUME_PRIVILEGE, 0);
+const LUID SeImpersonatePrivilege = CONST_LUID(SE_IMPERSONATE_PRIVILEGE, 0);
+const LUID SeCreateGlobalPrivilege = CONST_LUID(SE_CREATE_GLOBAL_PRIVILEGE, 0);
+const LUID SeTrustedCredmanPrivilege = CONST_LUID(SE_TRUSTED_CREDMAN_ACCESS_PRIVILEGE, 0);
+const LUID SeRelabelPrivilege = CONST_LUID(SE_RELABEL_PRIVILEGE, 0);
+const LUID SeIncreaseWorkingSetPrivilege = CONST_LUID(SE_INC_WORKING_SET_PRIVILEGE, 0);
+const LUID SeTimeZonePrivilege = CONST_LUID(SE_TIME_ZONE_PRIVILEGE, 0);
+const LUID SeCreateSymbolicLinkPrivilege = CONST_LUID(SE_CREATE_SYMBOLIC_LINK_PRIVILEGE, 0);
 
 BOOL SetPrivilege(
     HANDLE hToken,          // access token handle
