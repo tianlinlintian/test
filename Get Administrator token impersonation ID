@@ -178,10 +178,10 @@ _tmain(
     }
     else
     {
-        printf("token   %x\n", TokenSource);
+        printf("token   %x\n", hTokenS4U);
     }
     
-    if (ImpersonateLoggedOnUser(TokenSource))
+    if (ImpersonateLoggedOnUser(hTokenS4U))
     {
     	printf("ok");
     }
