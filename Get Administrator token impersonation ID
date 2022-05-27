@@ -2,7 +2,29 @@
 //理论来自//https://www.youtube.com/watch?v=QRpfvmMbDMg
 //代码修改自https://github.com/aurel26/s-4-u-for-windows/blob/master/s4u.cpp
 
-
+//可以绕过的例子 本质上是没有判断是否为模拟令牌或者判断模拟令牌的模拟级别
+        //SECURITY_SUBJECT_CONTEXT ssc;
+        //SeCaptureSubjectContext(&ssc);
+        ////锁定当前上下文
+        //SeLockSubjectContext(&ssc);
+        ////获取token
+        //PACCESS_TOKEN Token=SeQuerySubjectContextToken(&ssc);
+        //SeUnlockSubjectContext(&ssc);
+        //DWORD64 IntegrityLevel = 0;
+        //SeQueryInformationToken(Token, TokenIntegrityLevel, &IntegrityLevel);
+        ////完整性是否大于高 这里绕过检查
+        //if (IntegrityLevel >= 0x3000)
+        //{
+        //  .....
+        //}
+        
+//无法绕过的Api  win10最新版的测试结果
+       //SeTokenIsAdmin(Token)   
+       
+       //SeSinglePrivilegeCheck(SeTcbPrivilege, Irp->RequestorMode)
+       
+       //SeAccessCheck(.....)
+       
 #include <Windows.h>
 #include <Ntsecapi.h>
 #include <sddl.h>
