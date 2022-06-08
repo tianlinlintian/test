@@ -1,4 +1,4 @@
-//alpc端口连接 以错误报告服务创建的端口名WindowsErrorReportingServicePort为例
+//alpc完成列表机制通信
 
 #include <windows.h>
 #include <stdio.h>
