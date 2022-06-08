@@ -1,4 +1,6 @@
 //alpc完成列表机制通信
+//部分代码取自https://csandker.io/2022/05/24/Offensive-Windows-IPC-3-ALPC.html
+
 
 #include <windows.h>
 #include <stdio.h>
