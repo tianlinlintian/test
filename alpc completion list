@@ -460,39 +460,39 @@ INT main()
 
 			//一般情况下使用lpMem->u2.s2.Type判断消息类型
 			//完成列表由于是异步 所以要使用事件通知辅助来通信
-			//switch (type)
-			//{
+			switch (type)
+			{
 
-			//	//Client disconnects
-			//case 0x5:
-			//	wprintf(L"[*] Client disconnects\n");
-			//	NtAlpcDisconnectPort(hCommunicationPort, 0);
-			//	NtAlpcDisconnectPort(hConnectionPort, 0);
-			//	break;
-			//	//Client sends message
-			//case 0x2001:
+				//Client disconnects
+			case 0x5:
+				wprintf(L"[*] Client disconnects\n");
+				NtAlpcDisconnectPort(hCommunicationPort, 0);
+				NtAlpcDisconnectPort(hConnectionPort, 0);
+				break;
+				//Client sends message
+			case 0x2001:
 
-			//	wprintf(L"[*] CompletionList.Buffer->DataOffset  %x \n", CompletionList.Buffer->DataOffset);
+				wprintf(L"[*] CompletionList.Buffer->DataOffset  %x \n", CompletionList.Buffer->DataOffset);
 
-			//	DumpHex((ULONG*)(test + CompletionList.Buffer->DataOffset), 0x50);
-			//	wprintf(L"---------------------------------\n");
-			//	if (!NT_SUCCESS(lSuccess)) {
-			//		wprintf(L"[-] Accept client messages Error: 0x%X\n", lSuccess);
-			//		exit(-1);
-			//	}
-			//	else wprintf(L"[+] Accept client message successfully \n", pwsPortName);
+				DumpHex((ULONG*)(test + CompletionList.Buffer->DataOffset), 0x50);
+				wprintf(L"---------------------------------\n");
+				if (!NT_SUCCESS(lSuccess)) {
+					wprintf(L"[-] Accept client messages Error: 0x%X\n", lSuccess);
+					exit(-1);
+				}
+				else wprintf(L"[+] Accept client message successfully \n", pwsPortName);
 
-			//	//wprintf(L"[+]%x\n", CompletionList.AttributeFlags);
-			//	break;
+				//wprintf(L"[+]%x\n", CompletionList.AttributeFlags);
+				break;
 
-			//}
+			}
 
 		}
-
+		
 	}
 	else
 	{
-
+		
 		wprintf(L"[+] Starting client. PID: %d | TID: %d\n", dwPID, dwTID);
 		DWORD           szInput[MSG_LEN + 1];
 
@@ -568,10 +568,10 @@ INT main()
 		//		DumpHex(viewAttr.ViewBase, 0x50);
 				//CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
 
-		while (true)
+		for (size_t i = 0; i < 0x200; i++)
 		{
 			SetEvent(handle);
-			Sleep(1);
+
 			lSuccess = NtAlpcSendWaitReceivePort(
 				hConnectionPort,
 				NULL,
@@ -584,24 +584,7 @@ INT main()
 			);
 		}
 			
-		//SetEvent(handle);
-		//lSuccess = NtAlpcSendWaitReceivePort(
-		//	hConnectionPort,
-		//	NULL,
-		//	lpMem,		// SendMessage_
-		//	NULL,		// SendMessageAttributes
-		//	NULL,		// receiving message
-		//	NULL,						// receiving message length
-		//	NULL,			// receive message attributes
-		//	NULL					// no timeout
-		//);
-		//if (!NT_SUCCESS(lSuccess)) {
-		//	wprintf(L"[-] NtAlpcSendWaitReceivePort Error: 0x%X\n", lSuccess);
-		//	exit(-1);
-
-		//}
-		//else wprintf(L"[+] NtAlpcSendWaitReceivePort Success \n", pwsPortName);
-
+			
 
 	}
 
