@@ -1,0 +1,204 @@
+
+#include <windows.h>
+#include <stdio.h>
+#include <windef.h>
+#include <Psapi.h>
+#include <winternl.h>
+#include"alpc.h"
+#include<sddl.h>
+#pragma comment(lib, "ntdll")
+
+#pragma warning(disable:4996)
+
+void DumpHex(const void* data, size_t size) {
+	char ascii[17];
+	size_t i, j;
+	ascii[16] = '\0';
+	for (i = 0; i < size; ++i) {
+		printf("%02X ", ((unsigned char*)data)[i]);
+		if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
+			ascii[i % 16] = ((unsigned char*)data)[i];
+		}
+		else {
+			ascii[i % 16] = '.';
+		}
+		if ((i + 1) % 8 == 0 || i + 1 == size) {
+			printf(" ");
+			if ((i + 1) % 16 == 0) {
+				printf("|  %s \n", ascii);
+			}
+			else if (i + 1 == size) {
+				ascii[(i + 1) % 16] = '\0';
+				if ((i + 1) % 16 <= 8) {
+					printf(" ");
+				}
+				for (j = (i + 1) % 16; j < 16; ++j) {
+					printf("   ");
+				}
+				printf("|  %s \n", ascii);
+			}
+		}
+	}
+}
+
+INT main()
+{
+
+
+	NTSTATUS lSuccess;
+	HANDLE hCommunicationPort = NULL;
+	UNICODE_STRING usAlpcPortName;
+	OBJECT_ATTRIBUTES objAttributes;
+	ALPC_PORT_ATTRIBUTES PortAttributes;
+	SECURITY_QUALITY_OF_SERVICE SecurityQos;
+
+	DWORD dwPID = GetCurrentProcessId();
+	DWORD dwTID = GetCurrentThreadId();
+
+	//创建一个有名字的Section对象 如果没有名字那就是无名Section对象
+	LPCWSTR pwsPortName = L"\\Device\\123123"; 
+	HANDLE				Handle;
+
+	RtlInitUnicodeString(&usAlpcPortName, pwsPortName);	// Initialize Unicode String
+	InitializeObjectAttributes(						// set up OBJECT_ATTRIBUTES structure
+		&objAttributes,		// the pointer to the OBJECT_ATTRIBUTES structure
+		&usAlpcPortName,	// the name the object we want to obtain a handle for
+		NULL,					// no flags, ref.: https://docs.microsoft.com/en-us/windows/win32/api/ntdef/nf-ntdef-initializeobjectattributes
+		NULL,				// no root directry handle as our port name is a full qualified path
+		NULL//pSD				// security descriptor
+	);
+
+	HANDLE handle = OpenEventW(EVENT_ALL_ACCESS, 0, L"Global\\hi");
+	//如果没有打开事件成功说明是主进程然后创建一个自身子进程
+	if (!handle) {
+		wprintf(L"[+] Starting 1. PID: %d | TID: %d\n", dwPID, dwTID);
+
+		handle = CreateEventW(0, 0, 0, L"Global\\hi");
+		
+		LARGE_INTEGER		Size = { 512 * 1024 };
+		lSuccess = NtCreateSection(&Handle,
+			SECTION_ALL_ACCESS,
+			&objAttributes,
+			&Size,
+			PAGE_EXECUTE_READWRITE,
+			SEC_COMMIT,
+			NULL);
+		PROCESS_INFORMATION pi = { 0 };
+		STARTUPINFOEXA si = { sizeof(si) };
+
+		if (!NT_SUCCESS(lSuccess)) {
+			wprintf(L"[-] NtCreateSection Error: 0x%X.\n", lSuccess);
+			getchar();
+			exit(-1);
+
+		}
+		else {
+			wprintf(L"[+] NtCreateSection Success.\n");
+		}
+
+
+
+		char szModule[MAX_PATH];
+		GetModuleFileNameA(NULL, szModule, MAX_PATH);
+
+		BOOL success = CreateProcessA(
+			NULL,
+			(LPSTR)szModule,
+			nullptr, nullptr, FALSE,
+			EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, nullptr, nullptr,
+			(LPSTARTUPINFOA)&si,
+			&pi
+		);
+		
+		//如果是创建Section ViewSize表示创建一个这么大的内存
+		SIZE_T ViewSize = 66 * 1024;
+		LARGE_INTEGER SOffset;
+		SOffset.QuadPart = 0;
+		PVOID VirtualAddress = 0;
+		PVOID VirtualAddress2 = 0;
+		PVOID VirtualAddress3 = 0;
+		//在本进进程映射一块内存
+		lSuccess = NtMapViewOfSection(Handle, (HANDLE)-1, &VirtualAddress, 0, 0, 0,
+			&ViewSize, ViewShare, 0, PAGE_EXECUTE_READWRITE);
+
+
+		if (!NT_SUCCESS(lSuccess)) {
+			wprintf(L"[-] NtMapViewOfSection Error: 0x%X.\n", lSuccess);
+			getchar();
+			exit(-1);
+		}
+		else {
+			wprintf(L"[+] NtMapViewOfSection Success.\n");
+		}
+		
+		//在子进程映射一块内存  如果后续仍然在对子进程NtMapViewOfSection 那么VirtualAddress依旧会是第一次的VirtualAddress
+		lSuccess = NtMapViewOfSection(Handle, (HANDLE)pi.hProcess, &VirtualAddress2, 0, 0, 0,
+			&ViewSize, ViewShare, 0, PAGE_EXECUTE_READWRITE);
+
+
+		if (!NT_SUCCESS(lSuccess)) {
+			wprintf(L"[-] NtMapViewOfSection Error: 0x%X.\n", lSuccess);
+			getchar();
+			exit(-1);
+		}
+		else {
+			wprintf(L"[+] NtMapViewOfSection Success.\n");
+			//打印下目标进程这块共享内存映射的地址
+			printf("[+] child process shared memory map %x\n", VirtualAddress2);
+			//打印下本进程这块共享内存映射的地址
+			printf("[+] The process shared memory map Address %x\n", VirtualAddress);
+			//在本进程上修改下这块内存映射的内容  目标进程这块内存也会改变
+			memset(VirtualAddress, 0x41, ViewSize);
+		}
+
+		getchar();
+	}
+	else
+	{
+
+		wprintf(L"[+] Starting 2. PID: %d | TID: %d\n", dwPID, dwTID);
+		lSuccess = NtOpenSection(&Handle, SECTION_ALL_ACCESS, &objAttributes);
+		if (!NT_SUCCESS(lSuccess)) {
+			wprintf(L"[-] NtOpenSection Error: 0x%X.\n", lSuccess);
+			getchar();
+			exit(-1);
+
+		}
+		else {
+			wprintf(L"[+] NtOpenSection Success.\n");
+		}
+	
+		//如果是打开Section ViewSize这个参数只要不大于NtCreateSection给的Size就行
+		SIZE_T ViewSize = 1;
+		LARGE_INTEGER SOffset;
+		SOffset.QuadPart = 0;
+		PVOID VirtualAddress = 0;
+
+		//这里再次映射，实际上还是返回了服务端创建Section映射到本进程的同一块内存
+		lSuccess = NtMapViewOfSection(Handle, (HANDLE)-1, &VirtualAddress, 0, 0, 0,
+			&ViewSize, ViewShare, 0, PAGE_EXECUTE_READWRITE);
+
+
+		if (!NT_SUCCESS(lSuccess)) {
+			wprintf(L"[-] NtMapViewOfSection Error: 0x%X.\n", lSuccess);
+			getchar();
+			exit(-1);
+		}
+		else {
+			wprintf(L"[+] NtMapViewOfSection Success.\n");
+			//打印下本进程这块共享内存映射的地址
+			printf("[+] The process shared memory map Address %x\n", VirtualAddress);
+			//打印下这块地址的内容 会发现是0x41
+			DumpHex(VirtualAddress, 0x50);
+			//修改下这块内存映射的内容
+			memset(VirtualAddress, 0x42, 0x50);
+			printf("[+] Modify memory\n");
+			//再次打印
+			DumpHex(VirtualAddress, 0x50);
+		}
+	}
+
+
+	getchar();
+
+}
