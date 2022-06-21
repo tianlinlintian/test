@@ -56,7 +56,7 @@ INT main()
 	DWORD dwTID = GetCurrentThreadId();
 
 	//创建一个有名字的Section对象 如果没有名字那就是无名Section对象
-	LPCWSTR pwsPortName = L"\\Device\\123123"; 
+	LPCWSTR pwsPortName = L"\\RPC Control\\123123"; 
 	HANDLE				Handle;
 
 	RtlInitUnicodeString(&usAlpcPortName, pwsPortName);	// Initialize Unicode String
