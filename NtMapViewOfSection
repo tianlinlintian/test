@@ -56,7 +56,7 @@ INT main()
 	DWORD dwTID = GetCurrentThreadId();
 
 	//创建一个有名字的Section对象 如果没有名字那就是无名Section对象
-	LPCWSTR pwsPortName = L"\\RPC Control\\123123"; 
+	LPCWSTR pwsPortName = L"\\RPC Control\\123123";
 	HANDLE				Handle;
 
 	RtlInitUnicodeString(&usAlpcPortName, pwsPortName);	// Initialize Unicode String
@@ -74,14 +74,14 @@ INT main()
 		wprintf(L"[+] Starting 1. PID: %d | TID: %d\n", dwPID, dwTID);
 
 		handle = CreateEventW(0, 0, 0, L"Global\\hi");
-		
-		LARGE_INTEGER		Size = { 512 * 1024 };
+
+		LARGE_INTEGER		Size = { 0x80000 };
 		lSuccess = NtCreateSection(&Handle,
 			SECTION_ALL_ACCESS,
 			&objAttributes,
 			&Size,
 			PAGE_EXECUTE_READWRITE,
-			SEC_COMMIT,
+			SEC_COMMIT  ,
 			NULL);
 		PROCESS_INFORMATION pi = { 0 };
 		STARTUPINFOEXA si = { sizeof(si) };
@@ -109,9 +109,9 @@ INT main()
 			(LPSTARTUPINFOA)&si,
 			&pi
 		);
-		
+
 		//如果是创建Section ViewSize表示创建一个这么大的内存
-		SIZE_T ViewSize = 66 * 1024;
+		SIZE_T ViewSize = 0x30000;
 		LARGE_INTEGER SOffset;
 		SOffset.QuadPart = 0;
 		PVOID VirtualAddress = 0;
@@ -130,7 +130,7 @@ INT main()
 		else {
 			wprintf(L"[+] NtMapViewOfSection Success.\n");
 		}
-		
+
 		//在子进程映射一块内存  如果后续仍然在对子进程NtMapViewOfSection 那么VirtualAddress依旧会是第一次的VirtualAddress
 		lSuccess = NtMapViewOfSection(Handle, (HANDLE)pi.hProcess, &VirtualAddress2, 0, 0, 0,
 			&ViewSize, ViewShare, 0, PAGE_EXECUTE_READWRITE);
@@ -167,7 +167,7 @@ INT main()
 		else {
 			wprintf(L"[+] NtOpenSection Success.\n");
 		}
-	
+
 		//如果是打开Section ViewSize这个参数只要不大于NtCreateSection给的Size就行
 		SIZE_T ViewSize = 1;
 		LARGE_INTEGER SOffset;
@@ -179,6 +179,7 @@ INT main()
 			&ViewSize, ViewShare, 0, PAGE_EXECUTE_READWRITE);
 
 
+	
 		if (!NT_SUCCESS(lSuccess)) {
 			wprintf(L"[-] NtMapViewOfSection Error: 0x%X.\n", lSuccess);
 			getchar();
@@ -196,6 +197,41 @@ INT main()
 			//再次打印
 			DumpHex(VirtualAddress, 0x50);
 		}
+		_SECTION_BASIC_INFORMATION basicinfo;
+
+		SIZE_T ret;
+		lSuccess = NtQuerySection(Handle, SectionBasicInformation, &basicinfo, sizeof(_SECTION_BASIC_INFORMATION), &ret);
+		if (!NT_SUCCESS(lSuccess)) {
+			wprintf(L"[-] NtQuerySection SectionBasicInformation Error: 0x%X.\n", lSuccess);
+			getchar();
+			exit(-1);
+		}
+		else
+		{
+			wprintf(L"[+] NtQuerySection SectionBasicInformation Success.\n");
+			//section本身大小  对应调用NtCreateSection时的大小
+			wprintf(L"[+] Section MaximumSize %llx\n", basicinfo.MaximumSize);
+			//section本身的属性  对应调用NtCreateSection时的页属性SEC_COMMIT
+			wprintf(L"[+] Section AllocationAttributes %lx\n", basicinfo.AllocationAttributes);
+			//不知道为啥 客户端和服务端都查不到这个值
+			wprintf(L"[+] Section BaseAddress %lx\n", basicinfo.BaseAddress);
+		}
+		SECTION_IMAGE_INFORMATION ImageInformation;
+
+
+		lSuccess = NtQuerySection(Handle, SectionBasicInformation, &ImageInformation, sizeof(SECTION_IMAGE_INFORMATION), &ret);
+		if (!NT_SUCCESS(lSuccess)) {
+			wprintf(L"[-] NtQuerySection SectionBasicInformation Error: 0x%X.\n", lSuccess);
+			getchar();
+			exit(-1);
+		}
+		else
+		{
+			wprintf(L"[+] NtQuerySection SectionBasicInformation Success.\n");
+			//查询文件映射才用到,所以为空
+			wprintf(L"[+] ImageInformation.TransferAddress %llx\n", ImageInformation.TransferAddress);
+		}
+
 	}
 
 
