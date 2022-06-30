@@ -213,7 +213,7 @@ INT main()
 			wprintf(L"[+] Section MaximumSize %llx\n", basicinfo.MaximumSize);
 			//section本身的属性  对应调用NtCreateSection时的页属性SEC_COMMIT
 			wprintf(L"[+] Section AllocationAttributes %lx\n", basicinfo.AllocationAttributes);
-			//不知道为啥 客户端和服务端都查不到这个值
+			//此字段未用
 			wprintf(L"[+] Section BaseAddress %lx\n", basicinfo.BaseAddress);
 		}
 		SECTION_IMAGE_INFORMATION ImageInformation;
@@ -231,6 +231,7 @@ INT main()
 			//查询文件映射才用到,所以为空
 			wprintf(L"[+] ImageInformation.TransferAddress %llx\n", ImageInformation.TransferAddress);
 		}
+		//NtQuerySection参数二SectionRelocationInformation以及以后的值在win10 上都没用到
 
 	}
 
