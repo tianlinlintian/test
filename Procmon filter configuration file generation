@@ -188,15 +188,15 @@ void SearchKey(HKEY hKey, LPCTSTR lpSubKey, LPCTSTR lpSubKey2, DWORD ACCESS)
 				if (ERROR_SUCCESS == RegOpenKeyExW(hSubKey, subKeyName,
 					NULL, ACCESS, &hSubKey2))
 				{
-					ULONG datasize = sizeof(data3) + 4 + (wcslen(L"HKLM\\") * 2) + (wcslen(subKeyName2) * 2) + 0xA;
+					ULONG datasize = sizeof(data3) + 4 + (wcslen(L"HKLM") * 2) + (wcslen(subKeyName2) * 2) + 0xA;
 					datasize2 += datasize;
-					ULONG datasize2 = (wcslen(L"HKLM\\") * 2) + (wcslen(subKeyName2) * 2) + 2;
+					ULONG datasize2 = (wcslen(L"HKLM") * 2) + (wcslen(subKeyName2) * 2) + 2;
 					memcpy(data7, data3, sizeof(data3));
 					memcpy(data7 + sizeof(data3), &datasize2, 4);
-					memcpy(data7 + sizeof(data3) + 4, L"HKLM\\", wcslen(L"HKLM\\") * 2);
-					memcpy(data7 + sizeof(data3) + 4 + wcslen(L"HKLM\\") * 2, subKeyName2, wcslen(subKeyName2) * 2);
+					memcpy(data7 + sizeof(data3) + 4, L"HKLM", wcslen(L"HKLM") * 2);
+					memcpy(data7 + sizeof(data3) + 4 + wcslen(L"HKLM") * 2, subKeyName2, wcslen(subKeyName2) * 2);
 
-					memset(data7 + sizeof(data3) + 4 + (wcslen(L"HKLM\\") * 2) + (wcslen(subKeyName2) * 2), 0, 0xA);
+					memset(data7 + sizeof(data3) + 4 + (wcslen(L"HKLM") * 2) + (wcslen(subKeyName2) * 2), 0, 0xA);
 
 					data7 += datasize;
 					num++;
