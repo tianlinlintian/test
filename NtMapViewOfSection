@@ -81,7 +81,7 @@ INT main()
 			&objAttributes,
 			&Size,
 			PAGE_EXECUTE_READWRITE,
-			SEC_COMMIT  ,
+			SEC_COMMIT,
 			NULL);
 		PROCESS_INFORMATION pi = { 0 };
 		STARTUPINFOEXA si = { sizeof(si) };
@@ -144,9 +144,9 @@ INT main()
 		else {
 			wprintf(L"[+] NtMapViewOfSection Success.\n");
 			//打印下目标进程这块共享内存映射的地址
-			printf("[+] child process shared memory map %x\n", VirtualAddress2);
+			printf("[+] child process shared memory map %llx\n", VirtualAddress2);
 			//打印下本进程这块共享内存映射的地址
-			printf("[+] The process shared memory map Address %x\n", VirtualAddress);
+			printf("[+] The process shared memory map Address %llx\n", VirtualAddress);
 			//在本进程上修改下这块内存映射的内容  目标进程这块内存也会改变
 			memset(VirtualAddress, 0x41, ViewSize);
 		}
@@ -179,7 +179,7 @@ INT main()
 			&ViewSize, ViewShare, 0, PAGE_EXECUTE_READWRITE);
 
 
-	
+
 		if (!NT_SUCCESS(lSuccess)) {
 			wprintf(L"[-] NtMapViewOfSection Error: 0x%X.\n", lSuccess);
 			getchar();
@@ -188,7 +188,7 @@ INT main()
 		else {
 			wprintf(L"[+] NtMapViewOfSection Success.\n");
 			//打印下本进程这块共享内存映射的地址
-			printf("[+] The process shared memory map Address %x\n", VirtualAddress);
+			printf("[+] The process shared memory map Address %llx\n", VirtualAddress);
 			//打印下这块地址的内容 会发现是0x41
 			DumpHex(VirtualAddress, 0x50);
 			//修改下这块内存映射的内容
