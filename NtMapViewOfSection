@@ -143,6 +143,8 @@ INT main()
 		}
 		else {
 			wprintf(L"[+] NtMapViewOfSection Success.\n");
+
+			wprintf(L"[+] Handle %x\n", Handle);
 			//打印下目标进程这块共享内存映射的地址
 			printf("[+] child process shared memory map %llx\n", VirtualAddress2);
 			//打印下本进程这块共享内存映射的地址
@@ -166,6 +168,7 @@ INT main()
 		}
 		else {
 			wprintf(L"[+] NtOpenSection Success.\n");
+			wprintf(L"[+] Handle %x\n", Handle);
 		}
 
 		//如果是打开Section ViewSize这个参数只要不大于NtCreateSection给的Size就行
